@@ -49,9 +49,40 @@ to reshuffle the discard pile in, and that needs the `rng`**, which `CardEffect.
 with ids read out of `G.drawPile`. 3.4 has to **decide**: a 4th primitive (`{t:'reveal', count}`, resolved in pump where
 the rng lives) or a `count`-carrying `moveCards`. That's a design call, so it belongs with the other complex tricks.
 
-**Next task (content track):** **3.4 — complex tricks** (Sonnet), which now also owns 五谷丰登. **4.1b is done** (below),
-so **4.2 / 4.3 / 4.4 are all unblocked and a skill is now pure content** — no engine work stands between them and the
-registry.
+**3.4 — complex tricks (+ 3.3b's 五谷丰登, + the standing U1/F3 items) is DONE.** 决斗/借刀杀人/南蛮入侵/万箭齐发/
+桃园结义/乐不思蜀/闪电/五谷丰登 all implemented and registered; every one of them rides the existing
+`{t:'demand'}`/`chooseCard` machinery from 3.2/3.3/4.1b — no new demand kind, no new bgio stage or move. Three
+things a later session should not re-derive: (1) **the reveal primitive is `{t:'reveal', count}`**, a 4th
+primitive resolved in `pump.ts` where the `rng` lives, chosen over a `count`-carrying `moveCards` because
+`moveCards` always names the exact ids it moves and a reveal can't know those in advance without touching `G`
+(engine-design §3 forbids that inside `resolve()`); 五谷丰登 self-wraps exactly ONE window around the reveal
+itself (`nullify:'custom'` — pump does not wrap these), then walks the pick order through 3.3's `chooseCard`
+slot protocol via a new `{z:'revealed', cardId}` variant. (2) **乐不思蜀/闪电 both set `nullify:'none'`, which is
+NOT the trick default** — the real 无懈可击 window for a delayed trick opens at the start of the victim's judge
+phase (`phases.ts`'s `delayedTrickOnNullified`), not at play time; leaving `nullify` unset would double-window
+the card. A nullified 闪电 travels on to the next eligible player instead of being discarded (judgement-
+nullification-design §2.4). (3) **U1 and F3 are both closed**: `engine/legalTargets.ts` is new (the `act`
+request now carries `legalTargets`, computed at request-pop time so it reflects any hand change earlier in the
+same batch); `client/src/game/log.ts` gained the three F3 keys these effects needed
+(`log.card_taken`/`log.reveals`/`log.picks`). Documented simplifications (AoE target-count not server-enforced;
+借刀杀人's pairwise range checked at resolve, not target-selection, time; "once per action phase" not enforced
+for 借刀杀人; 五谷丰登's new `chooseCard` slot variant has no client renderer yet, same shape as 3.3's own gap
+before 6.4b closed it) and every shared-file hunk: [`docs/handoff/3.4-complex-tricks.md`](docs/handoff/3.4-complex-tricks.md).
+⚠️ **This session's bash sandbox could not complete a build/test run** — a repo-wide scan found roughly 20 files
+(3.4's own new effects plus `pump.ts`/`frames.ts`/`cardChoice.ts`/`phases.ts`/`state.ts`/`setup.ts`/three
+registries/five pre-existing test files) reading torn (stale, truncated mid-token) off the bash mount despite
+being confirmed complete and correct via the file tools — matching this file's own documented mount-lag gotcha,
+just at a larger scale than previously logged. Both locale files and `client/src/game/log.ts` were found torn
+too and were fixed in place (rewritten with `Read`-tool-confirmed content, re-verified after a few seconds'
+propagation delay — see the handoff doc §4 for the full list and why the rest were left alone rather than
+guessed at). **The next session should run `run-tests.bat` on the Windows side before starting 3.7**, treat any
+red result there as real, and not re-diagnose a bash-side "syntax error" in any of the listed files without
+first re-reading it with the `Read` tool.
+
+**4.1b is done** (below), so **4.2 / 4.3 / 4.4 are all unblocked and a skill is now pure content** — no engine
+work stands between them and the registry. **4.3 (Batch B) and 4.4 (Batch C, now including 国色 which needed
+3.4's 乐不思蜀) are next** — see `docs/build-breakdown.md`'s Wave 2 lanes (E/F) in
+[`docs/finish-workflow-plan.md`](docs/finish-workflow-plan.md).
 
 **3.5/3.6 (equipment zone + all 11 weapon/armour handlers) are DONE**, run concurrently with 3.4/4.2/deploy. One shared
 `CardEffect` (`content/effects/equip.ts`) handles all 13 equipment `effectKey`s ("equipping IS the effect" —
