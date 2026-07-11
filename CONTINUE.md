@@ -68,16 +68,12 @@ same batch); `client/src/game/log.ts` gained the three F3 keys these effects nee
 借刀杀人's pairwise range checked at resolve, not target-selection, time; "once per action phase" not enforced
 for 借刀杀人; 五谷丰登's new `chooseCard` slot variant has no client renderer yet, same shape as 3.3's own gap
 before 6.4b closed it) and every shared-file hunk: [`docs/handoff/3.4-complex-tricks.md`](docs/handoff/3.4-complex-tricks.md).
-⚠️ **This session's bash sandbox could not complete a build/test run** — a repo-wide scan found roughly 20 files
-(3.4's own new effects plus `pump.ts`/`frames.ts`/`cardChoice.ts`/`phases.ts`/`state.ts`/`setup.ts`/three
-registries/five pre-existing test files) reading torn (stale, truncated mid-token) off the bash mount despite
-being confirmed complete and correct via the file tools — matching this file's own documented mount-lag gotcha,
-just at a larger scale than previously logged. Both locale files and `client/src/game/log.ts` were found torn
-too and were fixed in place (rewritten with `Read`-tool-confirmed content, re-verified after a few seconds'
-propagation delay — see the handoff doc §4 for the full list and why the rest were left alone rather than
-guessed at). **The next session should run `run-tests.bat` on the Windows side before starting 3.7**, treat any
-red result there as real, and not re-diagnose a bash-side "syntax error" in any of the listed files without
-first re-reading it with the `Read` tool.
+✅ **Verified via `run-tests.bat` on Windows: clean build, 357 server / 138 client tests, all green, no
+regressions.** (The bash-sandbox torn-read concern flagged earlier was sandbox-side only, traced to a
+`node_modules` with an empty `.bin` — almost certainly from an earlier `npm install` run against this mount
+from a non-Windows shell, which the sandbox gotchas above already warn against. Deleting `node_modules` and
+letting `run-tests.bat` reinstall natively fixed it. The on-disk code was correct throughout; nothing in the
+handoff doc's §4 needed re-deriving.)
 
 **4.1b is done** (below), so **4.2 / 4.3 / 4.4 are all unblocked and a skill is now pure content** — no engine
 work stands between them and the registry. **4.3 (Batch B) and 4.4 (Batch C, now including 国色 which needed
