@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: three-kingdoms-kill-server
+    env: node
+    plan: free
+    # This repo is an npm-workspaces monorepo. Render must install from the REPO
+    # ROOT (so the workspaces resolve) but build and start the SERVER workspace.
+    # The old config ran a bare `npm start` at the root — the root package.json
+    # has no `start` script, so the service built fine and then crashed on boot.
+    # The `-w server` flags are what make this correct.
+    rootDir: .
+    buildCommand: npm ci && npm run build -w server
+    startCommand: npm start -w server
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # PORT is injected by Render — do not hardcode it. server.ts already reads
+      # process.env.PORT and falls back to 3000 locally.
+      - key: CLIENT_ORIGIN
+        # Set to the deployed Netlify URL, e.g.
+        #   https://three-kingdoms-kill-abc123.netlify.app
+        # Without it the server rejects the browser's origin and every
+        # connection fails (see DEPLOY.md troubleshooting).
+        sync: false

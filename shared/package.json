@@ -1,0 +1,16 @@
+{
+  "name": "@3k/shared",
+  "version": "0.0.1",
+  "description": "Shared types + card/general content re-exports for client and server. Resolved by package name (not a relative ../../ reach) so consumers with a restrictive rootDir (server/tsconfig.json) don't break — see docs/engine-design.md §8.",
+  "private": true,
+  "type": "module",
+  "main": "./dist/shared/src/index.js",
+  "types": "./dist/shared/src/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"no tests in shared — see server/test/content.test.ts\" && exit 0"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2"
+  }
+}

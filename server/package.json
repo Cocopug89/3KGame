@@ -1,0 +1,22 @@
+{
+  "name": "three-kingdoms-kill-server",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "node --loader ts-node/esm --experimental-specifier-resolution=node src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@3k/shared": "^0.0.1",
+    "boardgame.io": "^0.50.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.2.2",
+    "vitest": "^2.1.8"
+  }
+}

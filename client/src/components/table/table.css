@@ -1,0 +1,792 @@
+/* Table layout (task 6.1). Clean and functional: no art assets, no motion —
+   animations are 6.3. Colours are the only semantics here, and they carry
+   exactly three signals: whose turn it is (blue), who the engine is waiting on
+   (amber), and who is dying/dead (red/grey). */
+
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Percentage-positioned seats need a sized box to be relative to. */
+.table__ring {
+  position: relative;
+  width: 100%;
+  min-height: 520px;
+  border-radius: 16px;
+  background: #e8efe9;
+  border: 1px solid #cfdad2;
+}
+
+.table__seat-slot,
+.table__center-slot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+.table__center-slot {
+  left: 50%;
+  top: 50%;
+}
+
+.table__bottom {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+/* ── seat ─────────────────────────────────────────────────────────────── */
+
+.seat {
+  min-width: 190px;
+  padding: 0.6rem 0.7rem;
+  border-radius: 10px;
+  background: #fff;
+  border: 2px solid #dcdcdc;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.seat--compact {
+  min-width: 172px;
+  font-size: 0.85rem;
+}
+
+.seat--viewer {
+  border-color: #b9c9ff;
+}
+
+.seat--turn {
+  border-color: #2f6feb;
+  box-shadow: 0 0 0 3px rgba(47, 111, 235, 0.15);
+}
+
+.seat--waiting {
+  border-color: #d98b00;
+  box-shadow: 0 0 0 3px rgba(217, 139, 0, 0.22);
+}
+
+.seat--dying {
+  background: #fff6f6;
+  border-color: #d9534f;
+}
+
+.seat--dead {
+  opacity: 0.55;
+  filter: grayscale(1);
+}
+
+.seat__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.seat__general {
+  font-weight: 700;
+}
+
+.seat__seatno,
+.seat__hand-count {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.seat__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin: 0.3rem 0;
+}
+
+.seat__waiting-flag {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  color: #8a5a00;
+}
+
+/* ── badges ───────────────────────────────────────────────────────────── */
+
+.badge {
+  display: inline-block;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  background: #eee;
+  color: #444;
+  white-space: nowrap;
+}
+
+.badge--you {
+  background: #2f6feb;
+  color: #fff;
+}
+
+.badge--role {
+  background: #ede7f6;
+  color: #4527a0;
+}
+
+.badge--lord {
+  background: #fff3cd;
+  color: #7a5c00;
+}
+.badge--loyalist {
+  background: #e3f2fd;
+  color: #0d47a1;
+}
+.badge--rebel {
+  background: #ffebee;
+  color: #b71c1c;
+}
+.badge--traitor {
+  background: #ede7f6;
+  color: #4527a0;
+}
+
+.badge--kingdom {
+  background: #f1f3f4;
+  color: #555;
+}
+.badge--wei {
+  background: #e8eaf6;
+  color: #283593;
+}
+.badge--shu {
+  background: #ffebee;
+  color: #c62828;
+}
+.badge--wu {
+  background: #e0f2f1;
+  color: #00695c;
+}
+.badge--qun {
+  background: #eceff1;
+  color: #37474f;
+}
+
+.badge--dying {
+  background: #d9534f;
+  color: #fff;
+}
+
+.badge--dead {
+  background: #6c757d;
+  color: #fff;
+}
+
+/* ── hp ───────────────────────────────────────────────────────────────── */
+
+.hp {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.hp__pips {
+  display: flex;
+  gap: 3px;
+}
+
+.hp__pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid #bbb;
+}
+
+.hp__pip--filled {
+  background: #3fa653;
+  border-color: #2e7d3a;
+}
+
+.hp__pip--low {
+  background: #d9534f;
+  border-color: #a33b38;
+}
+
+.hp__pip--empty {
+  background: #fff;
+}
+
+.hp__count {
+  font-size: 0.72rem;
+  color: #666;
+}
+
+/* ── cards ────────────────────────────────────────────────────────────── */
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin: 0;
+  padding: 0.25rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  color: #333;
+  font-size: 0.75rem;
+  text-align: center;
+  cursor: default;
+  overflow: hidden;
+}
+
+.card--sm {
+  width: 46px;
+  height: 62px;
+  font-size: 0.62rem;
+}
+
+.card--md {
+  width: 66px;
+  height: 92px;
+}
+
+.card--interactive {
+  cursor: pointer;
+}
+
+.card--interactive:hover {
+  border-color: #2f6feb;
+  background: #f5f8ff;
+}
+
+.card--selected {
+  border-color: #2f6feb;
+  background: #eaf1ff;
+  transform: translateY(-6px);
+}
+
+.card--basic {
+  border-top: 3px solid #3fa653;
+}
+.card--trick {
+  border-top: 3px solid #2f6feb;
+}
+.card--equipment {
+  border-top: 3px solid #b58900;
+}
+
+.card--back {
+  background: repeating-linear-gradient(45deg, #4a5568, #4a5568 4px, #5a6678 4px, #5a6678 8px);
+  border-color: #3c4658;
+}
+
+.card--empty {
+  background: #f4f4f4;
+  border-style: dashed;
+  color: #999;
+}
+
+.card--unknown {
+  background: #fff0f0;
+  border-color: #d9534f;
+  color: #d9534f;
+}
+
+.card__corner {
+  align-self: flex-start;
+  font-size: 0.62rem;
+  color: #444;
+}
+
+.card__corner--red {
+  color: #d0342c;
+}
+
+.card__name {
+  font-weight: 600;
+  line-height: 1.15;
+  word-break: break-word;
+}
+
+.card__subtitle {
+  font-size: 0.58rem;
+  color: #888;
+}
+
+/* ── equipment / judgement ────────────────────────────────────────────── */
+
+.equip {
+  display: flex;
+  gap: 3px;
+  margin-top: 0.4rem;
+}
+
+.judge {
+  margin-top: 0.4rem;
+}
+
+.judge__label {
+  font-size: 0.68rem;
+  color: #666;
+}
+
+.judge__cards {
+  display: flex;
+  gap: 3px;
+}
+
+/* ── hand ─────────────────────────────────────────────────────────────── */
+
+.hand {
+  flex: 1 1 420px;
+  padding: 0.6rem 0.7rem;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #dcdcdc;
+}
+
+.hand__label {
+  font-size: 0.78rem;
+  color: #666;
+  margin-bottom: 0.4rem;
+}
+
+.hand__cards {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  min-height: 96px;
+}
+
+.hand__empty {
+  color: #999;
+}
+
+/* ── centre ───────────────────────────────────────────────────────────── */
+
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  background: #ffffffcc;
+  border: 1px solid #d5ded8;
+  min-width: 260px;
+}
+
+.center__status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.center__phase {
+  font-weight: 700;
+}
+
+.center__turn {
+  font-size: 0.8rem;
+  color: #555;
+}
+
+.center__waiting {
+  font-size: 0.78rem;
+  color: #8a5a00;
+}
+
+.center__waiting--you {
+  font-weight: 700;
+  color: #b36b00;
+}
+
+.center__piles {
+  display: flex;
+  gap: 1rem;
+}
+
+.pile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.pile__label {
+  font-size: 0.68rem;
+  color: #666;
+}
+
+.center__gameover {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid #e3e3e3;
+  font-size: 0.85rem;
+}
+
+/* ── interaction layer (6.2) ──────────────────────────────────────────── */
+
+/* A seat you may click as a target. Green = "you can pick this", which is
+   distinct from every other signal on the table (blue = turn, amber = the
+   engine is waiting, red = dying) precisely because it means something the
+   player *does*, not something that is. */
+.seat--targetable {
+  cursor: pointer;
+  border-color: #3fa653;
+  box-shadow: 0 0 0 3px rgba(63, 166, 83, 0.18);
+}
+
+.seat--targetable:hover {
+  background: #f3fbf4;
+}
+
+.seat--targeted {
+  border-color: #2e7d3a;
+  box-shadow: 0 0 0 4px rgba(46, 125, 58, 0.35);
+}
+
+.seat__target-flag {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #2e7d3a;
+}
+
+/* Greyed, not hidden: the player knows they hold this card, so removing it
+   would be lying — it just can't answer *this* question. */
+.card--blocked {
+  opacity: 0.42;
+  filter: grayscale(0.8);
+  cursor: not-allowed;
+}
+
+.table__side {
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 240px;
+}
+
+.prompt {
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  background: #fffdf5;
+  border: 2px solid #d98b00;
+}
+
+.prompt--rejected {
+  border-color: #d9534f;
+  background: #fff6f6;
+}
+
+.prompt__title {
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.prompt__hint {
+  font-size: 0.78rem;
+  color: #666;
+}
+
+.prompt__error {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #b02a26;
+}
+
+.prompt__buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+/* The chooseCard answer surface (3.3). It sits ABOVE the prompt panel in the
+   side column because it *is* the answer: the hand below is inert during this
+   request, and a player who only looks at their own cards will never find the
+   move. Hand slots render as backs — see ChoicePanel: we are not told what they
+   are, on purpose. */
+.choices {
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  background: #f6f2ff;
+  border: 2px solid #7952b3;
+}
+
+.choices__label {
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin-bottom: 0.4rem;
+}
+
+.choices__zones {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.choices__zone-label {
+  font-size: 0.72rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.choices__cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+}
+
+/* A face-down card is normally inert (aria-hidden, no handler). Here it IS the
+   button, so it has to look like one. */
+.choices .card--back.card--interactive {
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 0.3rem;
+}
+
+.choices .card--back.card--interactive:hover {
+  transform: translateY(-3px);
+}
+
+.btn {
+  margin-top: 0;
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn--primary {
+  background: #2f6feb;
+  color: #fff;
+}
+
+.btn--primary:disabled {
+  background: #c8cdd6;
+  cursor: not-allowed;
+}
+
+.btn--secondary {
+  background: #e6e6e6;
+  color: #333;
+}
+
+.log {
+  flex: 1;
+  padding: 0.6rem 0.7rem;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #dcdcdc;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.log__label {
+  font-size: 0.78rem;
+  color: #666;
+  margin-bottom: 0.35rem;
+}
+
+.log__empty {
+  color: #999;
+}
+
+.log__entries {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.log__entry {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* ── motion (6.3) ─────────────────────────────────────────────────────────
+   The board gets snapshots, not events, so every animation here is triggered by
+   a class the state-diff (game/transitions.ts) hands down for ~700ms.
+
+   Rules this obeys:
+   • Motion reinforces the three signals the table already has (turn / waiting /
+     dying), it doesn't add a fourth vocabulary.
+   • Nothing animates layout (no width/height/margin) — only transform, opacity
+     and colour, so a shake can't reflow the ring or make a seat jump.
+   • Everything below is switched off under prefers-reduced-motion. A player who
+     has asked their OS not to move things must still see WHAT happened, so the
+     colour flashes stay and only the movement goes. */
+
+.seat {
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    opacity 400ms ease,
+    filter 400ms ease;
+}
+
+/* Damage: a short shake plus a red wash. The shake is deliberately small —
+   it must read at a glance across the ring without dragging the eye away from
+   whatever the player is being asked to answer. */
+@keyframes fx-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+
+@keyframes fx-flash-red {
+  0%, 100% { background: #fff; }
+  30% { background: #ffdad8; }
+}
+
+.fx-damage {
+  animation: fx-shake 380ms ease-in-out, fx-flash-red 700ms ease-out;
+}
+
+@keyframes fx-flash-green {
+  0%, 100% { background: #fff; }
+  30% { background: #dff3e2; }
+}
+
+.fx-heal {
+  animation: fx-flash-green 700ms ease-out;
+}
+
+/* Dying: a slow pulse that keeps going until the window closes — this one is a
+   state, not an instant, and the table needs to keep noticing it. */
+@keyframes fx-pulse-red {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(217, 83, 79, 0.25); }
+  50% { box-shadow: 0 0 0 7px rgba(217, 83, 79, 0.45); }
+}
+
+.seat--dying {
+  animation: fx-pulse-red 1200ms ease-in-out infinite;
+}
+
+.fx-dying {
+  animation: fx-shake 380ms ease-in-out, fx-pulse-red 1200ms ease-in-out infinite;
+}
+
+/* Death: fade and desaturate into the .seat--dead resting state, so the seat
+   doesn't simply blink out — players track who is left by looking at the ring. */
+@keyframes fx-fade-out {
+  0% { opacity: 1; filter: grayscale(0); transform: scale(1); }
+  100% { opacity: 0.55; filter: grayscale(1); transform: scale(0.97); }
+}
+
+.fx-death {
+  animation: fx-fade-out 700ms ease-out forwards;
+}
+
+@keyframes fx-lift {
+  0% { transform: translateY(6px); opacity: 0.4; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.fx-drew .seat__hand-count,
+.fx-discarded .seat__hand-count {
+  display: inline-block;
+  animation: fx-lift 400ms ease-out;
+}
+
+/* The played card: lands on the discard pile from above, which is the one cue
+   that says "this is the card everyone is now answering". */
+@keyframes fx-play-card {
+  0% { transform: translateY(-38px) scale(1.12); opacity: 0; }
+  60% { transform: translateY(0) scale(1.06); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.fx-played {
+  animation: fx-play-card 520ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+/* A seat you may click: a gentle breathing ring. Green, and only ever on
+   targetable seats, so motion here always means "you can act on this". */
+@keyframes fx-target-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(63, 166, 83, 0.18); }
+  50% { box-shadow: 0 0 0 6px rgba(63, 166, 83, 0.32); }
+}
+
+.seat--targetable {
+  animation: fx-target-pulse 1600ms ease-in-out infinite;
+}
+
+.card--selected {
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.card--interactive:hover {
+  transform: translateY(-3px);
+  transition: transform 120ms ease;
+}
+
+/* The prompt is the thing a blocked player must notice; it arrives, it doesn't
+   appear. */
+@keyframes fx-prompt-in {
+  0% { transform: translateY(-6px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.prompt {
+  animation: fx-prompt-in 220ms ease-out;
+}
+
+@keyframes fx-log-in {
+  0% { transform: translateX(-8px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+.log__entry:first-child {
+  animation: fx-log-in 260ms ease-out;
+}
+
+/* Respect the OS setting. Colour flashes survive (they carry information);
+   movement, pulsing and the infinite loops do not. */
+@media (prefers-reduced-motion: reduce) {
+  .seat,
+  .card--selected,
+  .card--interactive:hover,
+  .prompt,
+  .log__entry:first-child,
+  .fx-drew .seat__hand-count,
+  .fx-discarded .seat__hand-count,
+  .fx-played {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+
+  .seat--dying,
+  .seat--targetable,
+  .fx-dying {
+    animation: none !important;
+  }
+
+  .fx-damage {
+    animation: fx-flash-red 700ms ease-out !important;
+  }
+
+  .fx-death {
+    animation: fx-fade-out 1ms linear forwards !important;
+  }
+}

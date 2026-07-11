@@ -1,0 +1,292 @@
+[
+  {
+    "id": "cao_cao",
+    "zhName": "曹操",
+    "enName": "Cao Cao",
+    "kingdom": "wei",
+    "gender": "male",
+    "maxHp": 4,
+    "skillIds": [
+      "jianxiong",
+      "hujia"
+    ]
+  },
+  {
+    "id": "sima_yi",
+    "zhName": "司马懿",
+    "enName": "Sima Yi",
+    "kingdom": "wei",
+    "gender": "male",
+    "maxHp": 3,
+    "skillIds": [
+      "fankui",
+      "guicai"
+    ]
+  },
+  {
+    "id": "xiahou_dun",
+    "zhName": "夏侯惇",
+    "enName": "Xiahou Dun",
+    "kingdom": "wei",
+    "gender": "male",
+    "maxHp": 4,
+    "skillIds": [
+      "ganglie"
+    ]
+  },
+  {
+    "id": "zhang_liao",
+    "zhName": "张辽",
+    "enName": "Zhang Liao",
+    "kingdom": "wei",
+    "gender": "male",
+    "maxHp": 3,
+    "skillIds": [
+      "tuxi"
+    ]
+  },
+  {
+    "id": "xu_chu",
+    "zhName": "许褚",
+    "enName": "Xu Chu",
+    "kingdom": "wei",
+    "gender": "male",
+    "maxHp": 4,
+    "skillIds": [
+      "luoyi"
+    ]
+  },
+  {
+    "id": "guo_jia",
+    "zhName": "郭嘉",
+    "enName": "Guo Jia",
+    "kingdom": "wei",
+    "gender": "male",
+    "maxHp": 3,
+    "skillIds": [
+      "tiandu",
+      "yiji"
+    ]
+  },
+  {
+    "id": "zhen_ji",
+    "zhName": "甄姬",
+    "enName": "Zhen Ji",
+    "kingdom": "wei",
+    "gender": "female",
+    "maxHp": 3,
+    "skillIds": [
+      "qingguo",
+      "luoshen"
+    ]
+  },
+  {
+    "id": "liu_bei",
+    "zhName": "刘备",
+    "enName": "Liu Bei",
+    "kingdom": "shu",
+    "gender": "male",
+    "maxHp": 4,
+    "skillIds": [
+      "rende",
+      "jijiang"
+    ]
+  },
+  {
+    "id": "guan_yu",
+    "zhName": "关羽",
+    "enName": "Guan Yu",
+    "kingdom": "shu",
+    "gender": "male",
+    "maxHp": 4,
+    "skillIds": [
+      "wusheng"
+    ]
+  },
+  {
+    "id": "zhang_fei",
+    "zhName": "张飞",
+    "enName": "Zhang Fei",
+    "kingdom": "shu",
+    "gender": "male",
+    "maxHp": 4,
+    "skillIds": [
+      "paoxiao"
+    ]
+  },
+  {
+    "id": "zhuge_liang",
+    "zhName": "诸葛亮",
+    "enName": "Zhuge Liang",
+    "kingdom": "shu",
+    "gender": "male",
+    "maxHp": 3,
+    "skillIds": [
+      "guanxing",
+      "kongcheng"
+    ]
+  },
+  {
+    "id": "zhao_yun",
+    "zhName": "赵云",
+    "enName": "Zhao Yun",
+    "kingdom": "shu",
+    "gender": "male",
+    "maxHp": 4,
+    "skillIds": [
+      "longdan"
+    ]
+  },
+  {
+    "id": "ma_chao",
+    "zhName": "马超",
+    "enName": "Ma Chao",
+    "kingdom": "shu",
+    "gender": "male",
+    "maxHp": 4,
+    "skillIds": [
+      "mashu",
+      "tieji"
+    ]
+  },
+  {
+    "id": "huang_yueying",
+    "zhName": "黄月英",
+    "enName": "Huang Yueying",
+    "kingdom": "shu",
+    "gender": "female",
+    "maxHp": 3,
+    "skillIds": [
+      "jizhi",
+      "qicai"
+    ]
+  },
+  {
+    "id": "sun_quan",
+    "zhName": "孙权",
+    "enName": "Sun Quan",
+    "kingdom": "wu",
+    "gender": "male",
+    "maxHp": 4,
+    "skillIds": [
+      "zhiheng",
+      "jiuyuan"
+    ]
+  },
+  {
+    "id": "gan_ning",
+    "zhName": "甘宁",
+    "enName": "Gan Ning",
+    "kingdom": "wu",
+    "gender": "male",
+    "maxHp": 4,
+    "skillIds": [
+      "qixi"
+    ]
+  },
+  {
+    "id": "lu_meng",
+    "zhName": "吕蒙",
+    "enName": "Lü Meng",
+    "kingdom": "wu",
+    "gender": "male",
+    "maxHp": 3,
+    "skillIds": [
+      "keji"
+    ]
+  },
+  {
+    "id": "huang_gai",
+    "zhName": "黄盖",
+    "enName": "Huang Gai",
+    "kingdom": "wu",
+    "gender": "male",
+    "maxHp": 3,
+    "skillIds": [
+      "kurou"
+    ]
+  },
+  {
+    "id": "zhou_yu",
+    "zhName": "周瑜",
+    "enName": "Zhou Yu",
+    "kingdom": "wu",
+    "gender": "male",
+    "maxHp": 3,
+    "skillIds": [
+      "yingzi",
+      "fanjian"
+    ]
+  },
+  {
+    "id": "da_qiao",
+    "zhName": "大乔",
+    "enName": "Da Qiao",
+    "kingdom": "wu",
+    "gender": "female",
+    "maxHp": 3,
+    "skillIds": [
+      "guose",
+      "liuli"
+    ]
+  },
+  {
+    "id": "lu_xun",
+    "zhName": "陆逊",
+    "enName": "Lu Xun",
+    "kingdom": "wu",
+    "gender": "male",
+    "maxHp": 3,
+    "skillIds": [
+      "qianxun",
+      "lianying"
+    ]
+  },
+  {
+    "id": "sun_shangxiang",
+    "zhName": "孙尚香",
+    "enName": "Sun Shangxiang",
+    "kingdom": "wu",
+    "gender": "female",
+    "maxHp": 3,
+    "skillIds": [
+      "jieyin",
+      "xiaoji"
+    ]
+  },
+  {
+    "id": "hua_tuo",
+    "zhName": "华佗",
+    "enName": "Hua Tuo",
+    "kingdom": "qun",
+    "gender": "male",
+    "maxHp": 3,
+    "skillIds": [
+      "jijiu",
+      "qingnang"
+    ]
+  },
+  {
+    "id": "lu_bu",
+    "zhName": "吕布",
+    "enName": "Lü Bu",
+    "kingdom": "qun",
+    "gender": "male",
+    "maxHp": 4,
+    "skillIds": [
+      "wushuang"
+    ]
+  },
+  {
+    "id": "diao_chan",
+    "zhName": "貂蝉",
+    "enName": "Diao Chan",
+    "kingdom": "qun",
+    "gender": "female",
+    "maxHp": 3,
+    "skillIds": [
+      "lijian",
+      "biyue"
+    ]
+  }
+]

@@ -1,0 +1,202 @@
+import { useMemo, useState } from 'react';
+import type { TableActions } from '../../game/actions';
+import {
+  EMPTY_SELECTION,
+  chooseSlot,
+  selectionKey,
+  toggleCard,
+  toggleTarget,
+} from '../../game/interaction';
+import type { Selection } from '../../game/interaction';
+import {
+  candidateTargets,
+  livingOthers as countLivingOthers,
+  promptFor,
+  targetRange,
+  viewerOf,
+} from '../../game/prompts';
+import { useTransitions } from '../../game/useTransitions';
+import { ringPositions, seatsForViewer } from '../../game/viewModel';
+import type { CardSlot, TableState } from '../../game/viewTypes';
+import { ChoicePanel } from './ChoicePanel';
+import { GameLog } from './GameLog';
+import { HandZone } from './HandZone';
+import { PlayerSeat } from './PlayerSeat';
+import { PromptPanel } from './PromptPanel';
+import { TableCenter } from './TableCenter';
+import './table.css';
+
+interface GameTableProps {
+  /** The playerView-shaped state, exactly as a boardgame.io client receives it. */
+  state: TableState;
+  /** boardgame.io playerID. Null = spectator (no hand, no own seat, no prompt). */
+  viewerId: string | null;
+  /** Omitted = read-only board (6.1's behaviour). Provided = the prompt fires moves. */
+  actions?: TableActions;
+  /** The server answered INVALID_MOVE to the last move we sent. */
+  rejected?: boolean;
+}
+
+/**
+ * The table (6.1) plus the interaction layer (6.2).
+ *
+ * Layout: the viewer sits at the bottom, opponents ring the table in seat order
+ * running clockwise from the viewer's left. Seats are positioned as percentages
+ * so 4- and 8-player games use one code path.
+ *
+ * Interaction: everything hangs off `G.pending` — the only thing that ever
+ * blocks the engine. If it names you, you get a prompt, a filtered hand, and
+ * (for an action-phase play) clickable seats; if it doesn't, the board is inert
+ * and says who it's waiting on. No rules are evaluated here: the client offers,
+ * the server decides, and an INVALID_MOVE comes back as `rejected`.
+ *
+ * Selection is keyed to the prompt + the hand, so it resets the moment the
+ * engine asks something new — a 闪 half-selected when the window closes must not
+ * survive into the next question.
+ */
+export function GameTable({ state, viewerId, actions, rejected = false }: GameTableProps) {
+  const { self, others } = seatsForViewer(state, viewerId);
+  const positions = ringPositions(others.length);
+
+  // 6.3: the server sends snapshots, not events, so what "just happened" is
+  // derived by diffing this state against the last one we rendered.
+  const fx = useTransitions(state);
+
+  const viewer = viewerOf(state, viewerId);
+  const prompt = actions ? promptFor(state, viewerId) : null;
+  const livingOthers = viewerId ? countLivingOthers(state, viewerId) : 0;
+
+  const key = selectionKey(prompt?.kind ?? null, viewer?.hand ?? []);
+  const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION);
+  const [selectionFor, setSelectionFor] = useState(key);
+  if (selectionFor !== key) {
+    // Render-phase reset (React's "derive state from props" escape hatch) rather
+    // than an effect: the alternative renders one frame of stale selection.
+    setSelectionFor(key);
+    setSelection(EMPTY_SELECTION);
+  }
+
+  const candidates = useMemo(() => {
+    if (!prompt?.needsTargets || !viewerId || selection.cards.length === 0) return [];
+    return candidateTargets(state, viewerId, selection.cards[0]);
+  }, [prompt, state, viewerId, selection.cards]);
+
+  const maxTargets =
+    selection.cards.length > 0 ? (targetRange(selection.cards[0], livingOthers)?.max ?? 0) : 0;
+
+  const onToggleCard = (cardId: string) =>
+    setSelection((cur) => (prompt ? toggleCard(cur, prompt, cardId) : cur));
+
+  const onTarget = (playerId: string) =>
+    setSelection((cur) => toggleTarget(cur, playerId, maxTargets));
+
+  const onChooseSlot = (slot: CardSlot) => setSelection((cur) => chooseSlot(cur, slot));
+
+  const submit = () => {
+    if (!actions || !prompt) return;
+    const [card] = selection.cards;
+    switch (prompt.kind) {
+      case 'act':
+        actions.playCard(card, selection.targets);
+        break;
+      // ONE branch for every demanded card (4.1b): 闪, 桃, 杀, 无懈可击. `count`
+      // may be more than one (无双), so the whole selection goes.
+      case 'demandCard':
+        actions.supplyCards(selection.cards);
+        break;
+      case 'confirmSkill':
+        actions.respondSkill(true);
+        break;
+      case 'discard':
+        actions.discard(selection.cards);
+        break;
+      // The answer is one of the TARGET's cards, not one of yours (3.3).
+      case 'chooseCard':
+        if (selection.slot) actions.chooseCard(selection.slot);
+        break;
+    }
+    setSelection(EMPTY_SELECTION);
+  };
+
+  const secondary = () => {
+    if (!actions || !prompt) return;
+    if (prompt.secondary === 'pass') actions.pass();
+    // Declining is the *absence* of a card, not a different move — the same
+    // move with no argument (see bgio/game.ts's supplyCards).
+    if (prompt.secondary === 'decline' && prompt.kind === 'demandCard') actions.supplyCards();
+    if (prompt.secondary === 'decline' && prompt.kind === 'confirmSkill') actions.respondSkill(false);
+    setSelection(EMPTY_SELECTION);
+  };
+
+  return (
+    <div className="table">
+      <div className="table__ring">
+        {others.map((seatView, i) => (
+          <div
+            key={seatView.playerId}
+            className="table__seat-slot"
+            style={{ left: `${positions[i].leftPct}%`, top: `${positions[i].topPct}%` }}
+          >
+            <PlayerSeat
+              seatView={seatView}
+              compact
+              targetable={candidates.includes(seatView.playerId)}
+              targeted={selection.targets.includes(seatView.playerId)}
+              onTarget={onTarget}
+              fxClass={fx.seatClasses[seatView.playerId]}
+            />
+          </div>
+        ))}
+
+        <div className="table__center-slot">
+          <TableCenter state={state} viewerId={viewerId} playedCardId={fx.playedCardId} />
+        </div>
+      </div>
+
+      <div className="table__bottom">
+        {self ? (
+          <PlayerSeat
+            seatView={self}
+            targetable={candidates.includes(self.playerId)}
+            targeted={selection.targets.includes(self.playerId)}
+            onTarget={onTarget}
+            fxClass={fx.seatClasses[self.playerId]}
+          />
+        ) : null}
+
+        <HandZone
+          state={state}
+          player={viewer}
+          prompt={prompt}
+          selectedCards={selection.cards}
+          onToggleCard={onToggleCard}
+        />
+
+        <div className="table__side">
+          {prompt?.kind === 'chooseCard' && prompt.choices && prompt.choiceTarget ? (
+            <ChoicePanel
+              state={state}
+              targetId={prompt.choiceTarget}
+              choices={prompt.choices}
+              selected={selection.slot}
+              onChoose={onChooseSlot}
+            />
+          ) : null}
+          {prompt && viewerId ? (
+            <PromptPanel
+              state={state}
+              viewerId={viewerId}
+              prompt={prompt}
+              selection={selection}
+              livingOthers={livingOthers}
+              onSubmit={submit}
+              onSecondary={secondary}
+              rejected={rejected}
+            />
+          ) : null}
+          <GameLog state={state} />
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,422 @@
+[
+  {
+    "id": "jianxiong",
+    "zhName": "奸雄",
+    "enName": "Villainous Hero",
+    "generalId": "cao_cao",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ]
+  },
+  {
+    "id": "hujia",
+    "zhName": "护驾",
+    "enName": "Royal Guard",
+    "generalId": "cao_cao",
+    "locked": false,
+    "lordOnly": true,
+    "kind": [
+      "trigger"
+    ]
+  },
+  {
+    "id": "fankui",
+    "zhName": "反馈",
+    "enName": "Reprisal",
+    "generalId": "sima_yi",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ]
+  },
+  {
+    "id": "guicai",
+    "zhName": "鬼才",
+    "enName": "Ghostly Talent",
+    "generalId": "sima_yi",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ]
+  },
+  {
+    "id": "ganglie",
+    "zhName": "刚烈",
+    "enName": "Unyielding",
+    "generalId": "xiahou_dun",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ],
+    "note": "Fires once per damage instance, not per point."
+  },
+  {
+    "id": "tuxi",
+    "zhName": "突袭",
+    "enName": "Raid",
+    "generalId": "zhang_liao",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ],
+    "note": "Replacement trigger: cancels the draw-phase body."
+  },
+  {
+    "id": "luoyi",
+    "zhName": "裸衣",
+    "enName": "Bare-Chested",
+    "generalId": "xu_chu",
+    "locked": false,
+    "kind": [
+      "trigger",
+      "query"
+    ],
+    "note": "NOT a locked skill (verified against two sources) — the choice is made by an optional phase.start trigger, which sets a turn flag the drawCount/damage.before handlers then read."
+  },
+  {
+    "id": "tiandu",
+    "zhName": "天妒",
+    "enName": "Envy of Heaven",
+    "generalId": "guo_jia",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ]
+  },
+  {
+    "id": "yiji",
+    "zhName": "遗计",
+    "enName": "Legacy",
+    "generalId": "guo_jia",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ],
+    "note": "Per POINT of damage, not per damage instance."
+  },
+  {
+    "id": "qingguo",
+    "zhName": "倾国",
+    "enName": "Peerless Beauty",
+    "generalId": "zhen_ji",
+    "locked": false,
+    "kind": [
+      "query"
+    ]
+  },
+  {
+    "id": "luoshen",
+    "zhName": "洛神",
+    "enName": "Spirit of the Luo",
+    "generalId": "zhen_ji",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ]
+  },
+  {
+    "id": "rende",
+    "zhName": "仁德",
+    "enName": "Benevolence",
+    "generalId": "liu_bei",
+    "locked": false,
+    "kind": [
+      "active"
+    ],
+    "note": "⚠ Corrected during the 4.1a cross-check: the design doc claimed Standard has no heal bonus. Two sources say it does."
+  },
+  {
+    "id": "jijiang",
+    "zhName": "激将",
+    "enName": "Bravery",
+    "generalId": "liu_bei",
+    "locked": false,
+    "lordOnly": true,
+    "kind": [
+      "trigger"
+    ]
+  },
+  {
+    "id": "wusheng",
+    "zhName": "武圣",
+    "enName": "God of War",
+    "generalId": "guan_yu",
+    "locked": false,
+    "kind": [
+      "query"
+    ]
+  },
+  {
+    "id": "paoxiao",
+    "zhName": "咆哮",
+    "enName": "Roar",
+    "generalId": "zhang_fei",
+    "locked": true,
+    "kind": [
+      "query"
+    ]
+  },
+  {
+    "id": "guanxing",
+    "zhName": "观星",
+    "enName": "Stargazing",
+    "generalId": "zhuge_liang",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ],
+    "note": "Private reveal: the cards ride in the PendingRequest payload, which playerView already sends only to that player."
+  },
+  {
+    "id": "kongcheng",
+    "zhName": "空城",
+    "enName": "Empty Fort",
+    "generalId": "zhuge_liang",
+    "locked": true,
+    "kind": [
+      "query"
+    ]
+  },
+  {
+    "id": "longdan",
+    "zhName": "龙胆",
+    "enName": "Dragon Heart",
+    "generalId": "zhao_yun",
+    "locked": false,
+    "kind": [
+      "query"
+    ]
+  },
+  {
+    "id": "mashu",
+    "zhName": "马术",
+    "enName": "Horsemanship",
+    "generalId": "ma_chao",
+    "locked": true,
+    "kind": [
+      "query"
+    ]
+  },
+  {
+    "id": "tieji",
+    "zhName": "铁骑",
+    "enName": "Iron Cavalry",
+    "generalId": "ma_chao",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ]
+  },
+  {
+    "id": "jizhi",
+    "zhName": "集智",
+    "enName": "Wisdom",
+    "generalId": "huang_yueying",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ]
+  },
+  {
+    "id": "qicai",
+    "zhName": "奇才",
+    "enName": "Ingenuity",
+    "generalId": "huang_yueying",
+    "locked": true,
+    "kind": [
+      "query"
+    ]
+  },
+  {
+    "id": "zhiheng",
+    "zhName": "制衡",
+    "enName": "Balance of Power",
+    "generalId": "sun_quan",
+    "locked": false,
+    "kind": [
+      "active"
+    ]
+  },
+  {
+    "id": "jiuyuan",
+    "zhName": "救援",
+    "enName": "Rescue",
+    "generalId": "sun_quan",
+    "locked": true,
+    "lordOnly": true,
+    "kind": [
+      "trigger"
+    ]
+  },
+  {
+    "id": "qixi",
+    "zhName": "奇袭",
+    "enName": "Surprise Raid",
+    "generalId": "gan_ning",
+    "locked": false,
+    "kind": [
+      "query"
+    ],
+    "note": "Needs task 3.3's dismantle effect."
+  },
+  {
+    "id": "keji",
+    "zhName": "克己",
+    "enName": "Self-Restraint",
+    "generalId": "lu_meng",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ],
+    "note": "⚠ Counts Strikes USED OR PLAYED — G.turnFlags.strikesPlayed only counts cards played through playCard (review F8), so this needs its own action-phase flag."
+  },
+  {
+    "id": "kurou",
+    "zhName": "苦肉",
+    "enName": "Flesh Wound",
+    "generalId": "huang_gai",
+    "locked": false,
+    "kind": [
+      "active"
+    ],
+    "note": "Unlimited per turn, and may be used to bring yourself to 0 — the dying window resolves first. This is phase-2-review's F1 reached with no Phase 3 card; needs 3.2's F1 fix."
+  },
+  {
+    "id": "yingzi",
+    "zhName": "英姿",
+    "enName": "Heroic Spirit",
+    "generalId": "zhou_yu",
+    "locked": true,
+    "kind": [
+      "query"
+    ],
+    "note": "Some printings word this as optional ('你可以额外摸一张牌'); declining is never advantageous, so v1 treats it as locked."
+  },
+  {
+    "id": "fanjian",
+    "zhName": "反间",
+    "enName": "Sow Discord",
+    "generalId": "zhou_yu",
+    "locked": false,
+    "kind": [
+      "active"
+    ],
+    "note": "Uses 3.1 §5's slot-based chooseCard request."
+  },
+  {
+    "id": "guose",
+    "zhName": "国色",
+    "enName": "National Beauty",
+    "generalId": "da_qiao",
+    "locked": false,
+    "kind": [
+      "query"
+    ],
+    "note": "Needs task 3.4's indulgence effect."
+  },
+  {
+    "id": "liuli",
+    "zhName": "流离",
+    "enName": "Wandering",
+    "generalId": "da_qiao",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ]
+  },
+  {
+    "id": "qianxun",
+    "zhName": "谦逊",
+    "enName": "Modesty",
+    "generalId": "lu_xun",
+    "locked": true,
+    "kind": [
+      "query"
+    ]
+  },
+  {
+    "id": "lianying",
+    "zhName": "连营",
+    "enName": "Chain Camps",
+    "generalId": "lu_xun",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ]
+  },
+  {
+    "id": "jieyin",
+    "zhName": "结姻",
+    "enName": "Marriage",
+    "generalId": "sun_shangxiang",
+    "locked": false,
+    "kind": [
+      "active"
+    ],
+    "note": "Needs the new `gender` field."
+  },
+  {
+    "id": "xiaoji",
+    "zhName": "枭姬",
+    "enName": "Warrior Lady",
+    "generalId": "sun_shangxiang",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ],
+    "note": "Needs task 3.5's equipment zone."
+  },
+  {
+    "id": "jijiu",
+    "zhName": "急救",
+    "enName": "First Aid",
+    "generalId": "hua_tuo",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ],
+    "note": "Supplies a peach into ANOTHER player's dying window — needs design §5's demand protocol."
+  },
+  {
+    "id": "qingnang",
+    "zhName": "青囊",
+    "enName": "Healing Salve",
+    "generalId": "hua_tuo",
+    "locked": false,
+    "kind": [
+      "active"
+    ]
+  },
+  {
+    "id": "wushuang",
+    "zhName": "无双",
+    "enName": "Peerless",
+    "generalId": "lu_bu",
+    "locked": true,
+    "kind": [
+      "query"
+    ]
+  },
+  {
+    "id": "lijian",
+    "zhName": "离间",
+    "enName": "Sow Dissent",
+    "generalId": "diao_chan",
+    "locked": false,
+    "kind": [
+      "active"
+    ],
+    "note": "⚠ Source variance: the 2008 rulebook says this Duel cannot be answered with Nullification; later printings allow it. v1 follows the 2008 text — flip `nullify` on the synthesized duel if playtesters disagree. Needs 3.4 + `gender`."
+  },
+  {
+    "id": "biyue",
+    "zhName": "闭月",
+    "enName": "Moonlight",
+    "generalId": "diao_chan",
+    "locked": false,
+    "kind": [
+      "trigger"
+    ]
+  }
+]
