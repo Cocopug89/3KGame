@@ -84,6 +84,7 @@ export const duel: CardEffect = {
 
     // `current` supplied a 杀 — the exchange flips: NOW `other` owes one.
     const frames: Frame[] = [
+      { t: 'log', key: 'log.responds', params: { player: current, card: supplied[0] } },
       {
         t: 'demand',
         kind: 'strike',

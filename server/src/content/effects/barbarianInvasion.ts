@@ -35,7 +35,9 @@ export const barbarianInvasion: CardEffect = {
     const target = (ctx.targets as PlayerId[])[0];
 
     if (!ctx.asked) {
+      const cards = ctx.cards as CardId[];
       return [
+        { t: 'log', key: 'log.plays_at', params: { player: source, card: cards[0], target } },
         {
           t: 'demand',
           kind: 'strike',
@@ -56,6 +58,6 @@ export const barbarianInvasion: CardEffect = {
         { t: 'log', key: 'log.damage', params: { target, n: 1, source } },
       ];
     }
-    return [];
+    return [{ t: 'log', key: 'log.responds', params: { player: target, card: supplied[0] } }];
   },
 };
