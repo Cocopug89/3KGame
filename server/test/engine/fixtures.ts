@@ -27,6 +27,7 @@ export function makeGState(overrides: Partial<GState> = {}): GState {
   return {
     drawPile: [],
     discardPile: [],
+    revealed: [],
     players: { '0': makePlayer('0'), '1': makePlayer('1') },
     seats: ['0', '1'],
     activeSeat: 0,

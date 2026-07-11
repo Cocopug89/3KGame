@@ -7,7 +7,7 @@ describe('resolve', () => {
   it('a request frame sets G.pending and does not push anything else', () => {
     const G = makeGState({ stack: [{ t: 'request', req: { kind: 'act', playerId: '0' } }] });
     resolve(G.stack.pop()!, G, identityRng);
-    expect(G.pending).toEqual({ kind: 'act', playerId: '0' });
+    expect(G.pending).toMatchObject({ kind: 'act', playerId: '0' });
     expect(G.stack).toEqual([]);
   });
 
@@ -329,7 +329,7 @@ describe('pump', () => {
     const G = makeGState({ drawPile: ['a', 'b'], stack: [{ t: 'phase', phase: 'prep' }] });
     pump(G, identityRng);
     // prep -> judge -> draw (draws 2) -> action pushes a request and blocks
-    expect(G.pending).toEqual({ kind: 'act', playerId: '0' });
+    expect(G.pending).toMatchObject({ kind: 'act', playerId: '0' });
     expect(G.players['0'].hand).toEqual(['a', 'b']);
     expect(G.turnPhase).toBe('action');
   });

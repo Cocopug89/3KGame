@@ -391,6 +391,10 @@ export const ThreeKingdomsGame: Game<GState, Record<string, unknown>, ThreeKingd
             pushFrames(G, [
               cardLostFrame(playerID, ids, 'hand'),
               { t: 'play', source: playerID, cards: ids, targets, effectKey },
+              // legalTargets (U1) is filled in by pump.ts's 'request' case at
+              // POP time, not here — the play frame above may still change this
+              // player's hand (无中生有 draws two), and computing it now would
+              // capture a stale snapshot from before that happens.
               { t: 'request', req: { kind: 'act', playerId: playerID } },
             ]);
             const rng = makeRng(random as BgioRandomLike);

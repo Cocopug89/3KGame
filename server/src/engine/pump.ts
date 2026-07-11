@@ -30,12 +30,13 @@ import type { RNG } from './rng.js';
 import { resolvePhase, resolvePhaseBody, endTurn } from './phases.js';
 import { askerAtOffset, deathConsequenceFrames, resolveDeath } from './dying.js';
 import { checkVictory } from './victory.js';
-import { drawCards, drawTop } from './deck.js';
+import { drawCards, drawTop, shuffleDeck } from './deck.js';
 import { ambiguousOrderGroup, fanOut, findTrigger } from './triggers.js';
 import { limitSpent, spendLimit } from './limits.js';
 import { cardsAs, demandCount } from './queries.js';
 import { getCard } from './cardIndex.js';
 import { pushFrames, applyToResumeFrame } from './stack.js';
+import { legalTargetsForHand } from './legalTargets.js';
 import { effectRegistry } from '../content/effectRegistry.js';
 import { skillRegistry } from '../content/skillRegistry.js';
 import { nullifyWindowFrame } from '../content/effects/nullifyWindow.js';
@@ -180,11 +181,20 @@ function takeFromZone(G: GState, zone: Zone, cards: readonly CardId[]): void {
       }
       return;
     }
-    case 'revealed':
-      // The 五谷丰登 pool (3.4). Cards sit in G.discardPile-adjacent limbo only
-      // for the length of one effect, so there is nothing to take them from
-      // yet — 3.4 adds the field when it adds the card.
-      throw new Error("moveCards: the 'revealed' zone is not implemented until task 3.4 (五谷丰登)");
+    case 'revealed': {
+      // The 五谷丰登 pool (3.4): a plain public array, same shape as
+      // discardPile. Cards land here only via the {t:'reveal'} primitive
+      // below (it needs the rng to reshuffle a short draw pile in, which
+      // CardEffect.resolve() may not touch — engine-design §3); moveCards
+      // only ever takes FROM here (a player's pick, or the harvest.ts cleanup
+      // sweeping leftovers to discard).
+      for (const id of cards) {
+        const i = G.revealed.indexOf(id);
+        if (i === -1) throw new Error(`moveCards: ${id} is not in the revealed pool`);
+        G.revealed.splice(i, 1);
+      }
+      return;
+    }
   }
 }
 
@@ -214,7 +224,12 @@ function putInZone(G: GState, zone: Zone, cards: readonly CardId[]): void {
       G.drawPile.unshift(...cards); // index 0 = top (state.ts)
       return;
     case 'revealed':
-      throw new Error("moveCards: the 'revealed' zone is not implemented until task 3.4 (五谷丰登)");
+      // Symmetry with takeFromZone's case, above — nothing in 3.4 actually
+      // moves a card INTO 'revealed' via moveCards (the {t:'reveal'} primitive
+      // populates it directly), but a future effect reusing the pool has
+      // somewhere correct to land.
+      G.revealed.push(...cards);
+      return;
   }
 }
 
@@ -257,7 +272,17 @@ export function resolve(frame: Frame, G: GState, rng: RNG): void {
       // A frame that needs a player decision sets G.pending and stops; the
       // frame that pushed this one is responsible for also pushing whatever it
       // needs to resume once the answer comes in (docs/engine-design.md §2).
-      G.pending = frame.req;
+      //
+      // U1 (CONTINUE.md's "Finding U1"): an 'act' request gets `legalTargets`
+      // filled in HERE, at pop time — not by whoever pushed the frame — so it
+      // is always computed against live state (a card played earlier in the
+      // same pushFrames batch, e.g. 无中生有's draw, has already happened by
+      // the time this pops) rather than a snapshot taken when the frame was
+      // constructed. engine/legalTargets.ts has the full reasoning.
+      G.pending =
+        frame.req.kind === 'act'
+          ? { ...frame.req, legalTargets: legalTargetsForHand(G, frame.req.playerId) }
+          : frame.req;
       return;
 
     case 'play': {
@@ -640,6 +665,19 @@ export function resolve(frame: Frame, G: GState, rng: RNG): void {
       return;
     }
 
+    case 'demandSupply': {
+      // Task 3.6's one addition (frames.ts): the mutation channel a
+      // demand.open listener uses to DEEM a demand answered without a card
+      // leaving anyone's hand — 八卦阵's judgement becoming a 闪. Asserts a
+      // demand is actually open, the same invariant 'setDamage'/'retrial'
+      // enforce for their own in-flight windows.
+      if (!G.demand) {
+        throw new Error("pump: a 'demandSupply' frame popped with no demand in flight");
+      }
+      G.demand.supplied = frame.cards;
+      return;
+    }
+
     // ── the three primitives (docs/judgement-nullification-design.md §4) ──
 
     case 'moveCards': {
@@ -672,6 +710,32 @@ export function resolve(frame: Frame, G: GState, rng: RNG): void {
 
     case 'skipPhase':
       if (!G.skipPhases.includes(frame.phase)) G.skipPhases.push(frame.phase);
+      return;
+
+    // 五谷丰登's reveal-primitive design call (task 3.4, frames.ts's comment on
+    // 'reveal' has the full reasoning). Mirrors drawTop()'s reshuffle-on-empty
+    // behaviour, but stops early rather than throwing if BOTH piles run dry —
+    // a card game reaching that point mid-effect shouldn't crash, it should
+    // just reveal fewer cards than players (vanishingly rare, same call
+    // deck.ts's drawCards makes).
+    case 'reveal': {
+      const revealed: CardId[] = [];
+      for (let i = 0; i < frame.count; i++) {
+        if (G.drawPile.length === 0) {
+          if (G.discardPile.length === 0) break;
+          G.drawPile = shuffleDeck(G.discardPile, rng);
+          G.discardPile = [];
+        }
+        revealed.push(G.drawPile.shift() as CardId);
+      }
+      G.revealed = revealed;
+      return;
+    }
+
+    // The one sanctioned way for content to write G.log (F3) — see frames.ts's
+    // comment on 'log'. Deliberately dumb, same shape as 'flag'.
+    case 'log':
+      G.log.push({ key: frame.key, ...(frame.params === undefined ? {} : { params: frame.params }) });
       return;
 
     // ── the dying window (docs/engine-design.md §5) ───────────────────────

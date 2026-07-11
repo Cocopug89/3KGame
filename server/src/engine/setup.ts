@@ -137,6 +137,7 @@ function baseState(
   return {
     drawPile: shuffleDeck(buildDeck(), rng),
     discardPile: [],
+    revealed: [],
     players,
     seats: [...playerIds],
     activeSeat: 0,

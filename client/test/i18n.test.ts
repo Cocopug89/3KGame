@@ -167,15 +167,17 @@ describe('i18n sweep · every key the code asks for exists', () => {
     // renderer guards with i18n.exists(), and this is the list that guard should
     // never actually need. The cards implemented today (3.3) are the ones that
     // can raise one.
-    for (const key of ['choose.dismantle', 'choose.steal']) {
+    for (const key of [
+      'choose.dismantle',
+      'choose.steal',
+      // 3.4: the delayed tricks (乐不思蜀/闪电) landed, so their judgement
+      // reasonKeys now have real strings — see docs/handoff/3.4-complex-tricks.md.
+      'judge.indulgence',
+      'judge.lightning',
+    ]) {
       expect(EN, `en is missing ${key}`).toHaveProperty([key]);
       expect(ZH, `zh is missing ${key}`).toHaveProperty([key]);
     }
-    // ⚠️ Deliberately NOT asserted: the judgement reasonKeys (`judge.indulgence`
-    // …) have no strings yet — the delayed tricks that raise them land in 3.4.
-    // The i18n.exists() fallback is what keeps that off the player's screen, and
-    // renderTable.test.tsx pins the fallback. Add the strings with the cards.
-    expect(EN['judge.indulgence']).toBeUndefined();
   });
 });
 

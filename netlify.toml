@@ -1,0 +1,44 @@
+# Netlify config for the client — task 7.1 (first real deploy).
+#
+# Lives at the REPO ROOT deliberately, not in client/. The previous version of
+# this file (task 0.3, fixed once already in docs/phase-0-1-audit.md) lived at
+# `client/netlify.toml` and depended on a dashboard-only "Base directory:
+# client" setting for Netlify to find it at all. That setup silently broke
+# the moment Phase 5 added the `@3k/shared` workspace dependency to the
+# client (client/src/game/, client/src/lobby/ all import it): a build scoped
+# to client/ alone runs `tsc -b && vite build` against a package whose dist/
+# was never produced, and fails outright. Verified failing 2026-07-11 from a
+# clean /tmp scratch build — see docs/handoff/7.1-first-deploy.md. Building
+# from the repo root removes the dashboard-setting dependency entirely: this
+# file is picked up with NO "Base directory" configured (leave it blank).
+
+[build]
+  command = "npm run build -w shared && npm run build -w client"
+  publish = "client/dist"
+
+[build.environment]
+  # Pin the Node version so a Netlify platform default bump can't silently
+  # change the build. 20 is what this repo has been built/tested against.
+  NODE_VERSION = "20"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# The app is a single page whose "routes" are query params (?table, ?gallery,
+# ?phase0 — see client/src/main.tsx), not real paths, so nothing in the app
+# actually needs this rewrite today. It costs nothing and protects against a
+# future path-based route (or a browser refresh on a deep link) 404ing on a
+# static host that otherwise only serves exact files.
+
+# VITE_SERVER_URL is deliberately NOT set here — see DEPLOY.md's "Client:
+# Netlify" section for why, and the two-fold trap the very first version of
+# this file fell into ([env.production] is not a real section; wss:// is the
+# wrong scheme for boardgame.io's SocketIO transport). Set it in the Netlify
+# dashboard (Site settings → Environment variables) to the Render server's
+# https:// URL once that's deployed, or commit it here once the URL is known
+# and stable:
+#
+#   [context.production.environment]
+#     VITE_SERVER_URL = "https://three-kingdoms-kill-server.onrender.com"

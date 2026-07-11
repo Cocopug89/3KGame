@@ -134,6 +134,15 @@ export interface GState {
   // ── hidden zones (stripped by playerView, task 5.4) ──────────────────
   drawPile: CardId[]; // index 0 = top. NEVER sent to any client.
   discardPile: CardId[]; // public; top card matters for a few effects
+  /**
+   * The 五谷丰登 pool (task 3.4) — cards taken off the top of the draw pile by
+   * the `{t:'reveal'}` primitive and shown face up while each player picks
+   * one. Public (it's face up on the table the instant it's revealed, same
+   * "delete hidden zones, never mask them" rule as G.judgement), and empty
+   * the rest of the time. `Zone`'s `{z:'revealed'}` (frames.ts) is what
+   * `{t:'moveCards'}` reads/writes here once a pick is made.
+   */
+  revealed: CardId[];
 
   // ── players ────────────────────────────────────────────────────────
   players: Record<PlayerId, PlayerState>;

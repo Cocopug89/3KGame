@@ -23,6 +23,28 @@ import { dyingWindow } from './effects/dyingWindow.js';
 import { dismantle } from './effects/dismantle.js';
 import { steal } from './effects/steal.js';
 import { drawTwo } from './effects/drawTwo.js';
+// Task 3.4's complex tricks + 3.3b's 五谷丰登. `indulgence`/`lightning` are
+// delayed tricks — see each file's header for the `nullify:'none'` timing-trap
+// note (judgement-nullification-design §3). `*_result`/`lightning_pass` are
+// internal onResult/travel handlers, dispatched the same way nullify_window/
+// dying_window are, not cards a player ever plays directly.
+import { duel } from './effects/duel.js';
+import { barbarianInvasion } from './effects/barbarianInvasion.js';
+import { rainingArrows } from './effects/rainingArrows.js';
+import { peachGarden } from './effects/peachGarden.js';
+import { duress } from './effects/duress.js';
+import { indulgence, indulgenceResult } from './effects/indulgence.js';
+import { lightning, lightningResult, lightningPass } from './effects/lightning.js';
+import { harvest } from './effects/harvest.js';
+// Task 3.5/3.6's equipment. `equip` is the one CardEffect shared by all 13
+// equipment effectKeys (engine-design §3: "equipping IS the effect"); the
+// other four are internal resume continuations, dispatched the same way
+// nullify_window/dying_window are — see each file's own header comment.
+import { equip } from './effects/equip.js';
+import { eightTrigramsResult } from './effects/eightTrigrams.js';
+import { frostBladeDiscard } from './effects/frostBlade.js';
+import { rockCleavingAxeHit } from './effects/rockCleavingAxe.js';
+import { genderSwordsGift } from './effects/genderSwords.js';
 
 export const effectRegistry: EffectRegistry = {
   strike,
@@ -36,4 +58,38 @@ export const effectRegistry: EffectRegistry = {
   dismantle,
   steal,
   draw_two: drawTwo,
+  // Task 3.4's complex tricks + 3.3b's 五谷丰登 (docs/handoff/3.4-complex-tricks.md).
+  duel,
+  barbarian_invasion: barbarianInvasion,
+  raining_arrows: rainingArrows,
+  peach_garden: peachGarden,
+  duress,
+  indulgence,
+  indulgence_result: indulgenceResult,
+  lightning,
+  lightning_result: lightningResult,
+  lightning_pass: lightningPass,
+  harvest,
+  // Task 3.5's equipment zone: one shared CardEffect ("equipping IS the
+  // effect", engine-design §3) registered under all 13 equipment effectKeys —
+  // 9 weapons + 2 armour + 2 horse directions (content/effects/equip.ts).
+  zhuge_crossbow: equip,
+  gender_swords: equip,
+  blue_steel_sword: equip,
+  frost_blade: equip,
+  rock_cleaving_axe: equip,
+  green_dragon_blade: equip,
+  serpent_spear: equip,
+  heaven_scorcher: equip,
+  unicorn_bow: equip,
+  eight_trigrams: equip,
+  renwang_shield: equip,
+  plus_horse: equip,
+  minus_horse: equip,
+  // Task 3.6's weapon/armour resume continuations — dispatched through
+  // {t:'resume'}/{t:'effect'} exactly like nullify_window/dying_window above.
+  eight_trigrams_result: eightTrigramsResult,
+  frost_blade_discard: frostBladeDiscard,
+  rock_cleaving_axe_hit: rockCleavingAxeHit,
+  gender_swords_gift: genderSwordsGift,
 };

@@ -12,8 +12,22 @@
 // optional · limit · batch for each, is docs/skill-trigger-design.md §8.
 
 import type { SkillRegistry } from './skillTypes.js';
+import * as batchA from './skills/batchA.js';
 
-export const skillRegistry: SkillRegistry = {};
+export const skillRegistry: SkillRegistry = {
+  wusheng: batchA.wusheng,
+  paoxiao: batchA.paoxiao,
+  longdan: batchA.longdan,
+  qingguo: batchA.qingguo,
+  kongcheng: batchA.kongcheng,
+  mashu: batchA.mashu,
+  yingzi: batchA.yingzi,
+  qicai: batchA.qicai,
+  qianxun: batchA.qianxun,
+  qixi: batchA.qixi,
+  biyue: batchA.biyue,
+  keji: batchA.keji,
+};
 
 /** The registry key an active skill's CardEffect is dispatched under (the
  * `useSkill` move pushes `{t:'effect', effectKey: activeEffectKey(id)}`).

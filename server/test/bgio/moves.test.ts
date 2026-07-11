@@ -192,7 +192,7 @@ describe('playCard', () => {
 
     expect(G.players['1'].hp).toBe(3);
     expect(G.demand).toBeNull();
-    expect(G.pending).toEqual({ kind: 'act', playerId: '0' }); // straight back to the striker
+    expect(G.pending).toMatchObject({ kind: 'act', playerId: '0' }); // straight back to the striker
   });
 
   it('playing 桃 on self heals and immediately re-opens the act request (no response needed)', () => {
@@ -211,7 +211,7 @@ describe('playCard', () => {
     expect(result).toBeUndefined();
     expect(G.players['0'].hp).toBe(3);
     expect(G.discardPile).toEqual(['peach_3h']);
-    expect(G.pending).toEqual({ kind: 'act', playerId: '0' }); // free to act again
+    expect(G.pending).toMatchObject({ kind: 'act', playerId: '0' }); // free to act again
     expect(events.setActivePlayers).toHaveBeenCalledWith({ value: { '0': 'act' } });
   });
 });
@@ -286,7 +286,7 @@ describe('supplyCards — 杀 → 闪 (was the respondDodge stage, deleted in 4.
     expect(G.discardPile).toEqual(['strike_2c', 'dodge_2h1']);
     expect(G.players['1'].hp).toBe(4); // undamaged
     expect(G.demand).toBeNull(); // demandClose cleared it on the way back
-    expect(G.pending).toEqual({ kind: 'act', playerId: '0' }); // striker acts again
+    expect(G.pending).toMatchObject({ kind: 'act', playerId: '0' }); // striker acts again
     expect(G.stack).toEqual([]);
     expect(events.setActivePlayers).toHaveBeenCalledWith({ value: { '0': 'act' } });
   });
@@ -304,7 +304,7 @@ describe('supplyCards — 杀 → 闪 (was the respondDodge stage, deleted in 4.
     expect(G.players['1'].hand).toEqual(['dodge_2h1']); // untouched — declined, not spent
     expect(G.players['1'].hp).toBe(3); // took 1 damage
     expect(G.damage).toBeNull(); // the window closed behind itself
-    expect(G.pending).toEqual({ kind: 'act', playerId: '0' });
+    expect(G.pending).toMatchObject({ kind: 'act', playerId: '0' });
   });
 
   it('the re-opened act request is real — a subsequent pass rotates the whole turn (no soft-lock)', () => {
@@ -313,7 +313,7 @@ describe('supplyCards — 杀 → 闪 (was the respondDodge stage, deleted in 4.
       { G, ctx: { currentPlayer: '0' }, random: identityRandom, events: makeEvents(), playerID: '1' },
       undefined,
     );
-    expect(G.pending).toEqual({ kind: 'act', playerId: '0' });
+    expect(G.pending).toMatchObject({ kind: 'act', playerId: '0' });
 
     const events = makeEvents();
     const result = actMoves.pass({
@@ -328,7 +328,7 @@ describe('supplyCards — 杀 → 闪 (was the respondDodge stage, deleted in 4.
     // completion and landed on the *next* player's action phase — proof
     // the phase machinery wasn't left dangling after playCard/supplyCards.
     expect(G.activeSeat).toBe(1);
-    expect(G.pending).toEqual({ kind: 'act', playerId: '1' });
+    expect(G.pending).toMatchObject({ kind: 'act', playerId: '1' });
     expect(events.setActivePlayers).toHaveBeenCalledWith({ value: { '1': 'act' } });
     expect(events.endTurn).toHaveBeenCalledWith({ next: '1' });
   });

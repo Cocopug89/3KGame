@@ -471,7 +471,7 @@ describe('视为 (playCard asEffectKey) and the demand protocol (§4.1, §5, §1
     G.players['1'].hand = ['dodge_2h1']; // one 闪, two demanded
 
     actMoves.playCard(moveCtx(G, '0'), 'strike_2c', ['1']);
-    expect(G.pending).toEqual({ kind: 'act', playerId: '0' });
+    expect(G.pending).toMatchObject({ kind: 'act', playerId: '0' });
     expect(G.players['1'].hp).toBe(3);
     expect(G.players['1'].hand).toEqual(['dodge_2h1']); // not spent
   });
@@ -558,7 +558,7 @@ describe('active skills (useSkill)', () => {
     // does not do it for them (仁德 gives them away, 苦肉 costs none at all).
     expect(G.players['0'].hand).toEqual(['peach_3h', 'strike_2c']);
     // …and the action phase is still the player's.
-    expect(G.pending).toEqual({ kind: 'act', playerId: '0' });
+    expect(G.pending).toMatchObject({ kind: 'act', playerId: '0' });
   });
 
   it('每回合限一次 is enforced by the engine, not by the skill', () => {

@@ -29,11 +29,19 @@ import type { Zone } from './frames.js';
  * One thing the attacker may point at. Hand cards are addressed by *index*
  * (opaque); public zones by card id (they are already face up, and naming them
  * leaks nothing).
+ *
+ * `{z:'revealed'}` (task 3.4, 五谷丰登) reuses this same slot protocol even
+ * though it isn't picking from anyone's hidden cards — G.revealed is public —
+ * because the underlying need is identical ("offer a set, get back a real id,
+ * re-validate against live state"), and the `chooseCard` stage/move already do
+ * exactly that generically. There is no `target` player for this variant;
+ * `resolveSlot` below ignores the `target` param for it.
  */
 export type CardSlot =
   | { z: 'hand'; index: number }
   | { z: 'equip'; cardId: CardId }
-  | { z: 'judgementZone'; cardId: CardId };
+  | { z: 'judgementZone'; cardId: CardId }
+  | { z: 'revealed'; cardId: CardId };
 
 const EQUIP_SLOTS = ['weapon', 'armour', 'plusHorse', 'minusHorse'] as const;
 
@@ -101,6 +109,14 @@ export function resolveSlot(
     case 'judgementZone': {
       if (!player.judgementZone.includes(slot.cardId)) return null;
       return { cardId: slot.cardId, zone: { z: 'judgementZone', player: target } };
+    }
+    case 'revealed': {
+      // The 五谷丰登 pool — public, not per-player. `target` is unused here;
+      // callers still pass one (the picker themselves) because `chooseCard`'s
+      // PendingRequest shape requires it, but it plays no role in resolving
+      // this slot.
+      if (!G.revealed.includes(slot.cardId)) return null;
+      return { cardId: slot.cardId, zone: { z: 'revealed' } };
     }
     default:
       return null;

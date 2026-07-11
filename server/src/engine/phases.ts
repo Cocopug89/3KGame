@@ -210,7 +210,9 @@ export function resolvePhaseBody(phase: TurnPhase, G: GState): void {
 
       case 'action':
         // 出牌阶段: give the active player the floor. The bgio adapter maps this
-        // to the 'act' stage; `pass` is what ends the phase.
+        // to the 'act' stage; `pass` is what ends the phase. `legalTargets`
+        // (U1, CONTINUE.md) is filled in by pump.ts's 'request' case at POP
+        // time, not here — see engine/legalTargets.ts.
         G.stack.push({ t: 'request', req: { kind: 'act', playerId: activePlayerId } });
         return;
 

@@ -3,13 +3,32 @@
 // (content/standard/cards.json), so an equipped 青龙偃月刀 contributes its
 // triggers simply by sitting in a slot.
 //
-// Task 3.6 fills this in. It is empty on purpose, not a stub: the fan-out
-// (engine/triggers.ts) walks it and finds nothing, which is a correct no-op.
+// Task 3.6 fills this in. 8 of the 11 weapon/armour pieces register a trigger
+// here; 诸葛连弩/丈八蛇矛/方天画戟 are pure queries (equipmentQueryRegistry.ts)
+// with no event to hang a listener on.
 
 import type { SkillTrigger, TriggerSource } from './triggerTypes.js';
 import type { GState, PlayerId } from '../engine/state.js';
 
-export const equipmentTriggerRegistry: Record<string, SkillTrigger[]> = {};
+import { genderSwordsTrigger } from './effects/genderSwords.js';
+import { blueSteelSwordTrigger } from './effects/blueSteelSword.js';
+import { frostBladeTrigger } from './effects/frostBlade.js';
+import { rockCleavingAxeTrigger } from './effects/rockCleavingAxe.js';
+import { greenDragonBladeTrigger } from './effects/greenDragonBlade.js';
+import { unicornBowTrigger } from './effects/unicornBow.js';
+import { eightTrigramsTrigger } from './effects/eightTrigrams.js';
+import { renwangShieldTrigger } from './effects/renwangShield.js';
+
+export const equipmentTriggerRegistry: Record<string, SkillTrigger[]> = {
+  gender_swords: [genderSwordsTrigger],
+  blue_steel_sword: [blueSteelSwordTrigger],
+  frost_blade: [frostBladeTrigger],
+  rock_cleaving_axe: [rockCleavingAxeTrigger],
+  green_dragon_blade: [greenDragonBladeTrigger],
+  unicorn_bow: [unicornBowTrigger],
+  eight_trigrams: [eightTrigramsTrigger],
+  renwang_shield: [renwangShieldTrigger],
+};
 
 /** Live read of the four equipment slots — never a cached list (see
  * TriggerSource's comment, and engine-design §4's 青釭剑 case). */

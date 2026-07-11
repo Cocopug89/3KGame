@@ -414,7 +414,7 @@ describe('ThreeKingdomsGame (bgio adapter)', () => {
     const after = readAsPendingPlayer(client);
     expect(after.G.players['1'].hp).toBe(hpBefore - 1);
     expect(after.G.players['1'].alive).toBe(true);
-    expect(after.G.pending).toEqual({ kind: 'act', playerId: '0' });
+    expect(after.G.pending).toMatchObject({ kind: 'act', playerId: '0' });
     expectInvariants(client);
 
     client.stop();
@@ -432,7 +432,7 @@ describe('ThreeKingdomsGame (bgio adapter)', () => {
     // will still be able to make this demand answerable when they exist.
     const after = readAsPendingPlayer(client);
     expect(after.G.players['1'].hp).toBe(hpBefore - 1);
-    expect(after.G.pending).toEqual({ kind: 'act', playerId: '0' });
+    expect(after.G.pending).toMatchObject({ kind: 'act', playerId: '0' });
     expectInvariants(client);
 
     client.stop();
@@ -468,7 +468,7 @@ describe('ThreeKingdomsGame (bgio adapter)', () => {
     expect(saved.G.players['1'].alive).toBe(true);
     expect(saved.G.players['1'].roleRevealed).toBe(revealedBefore); // survived ⇒ no reveal
     expect(saved.G.discardPile).toContain(PEACHES[0]);
-    expect(saved.G.pending).toEqual({ kind: 'act', playerId: '0' }); // striker acts on
+    expect(saved.G.pending).toMatchObject({ kind: 'act', playerId: '0' }); // striker acts on
     expectInvariants(client);
 
     client.stop();
@@ -490,7 +490,7 @@ describe('ThreeKingdomsGame (bgio adapter)', () => {
     // {t:'demandAsk'} walks straight past everyone who cannot answer instead of
     // asking them.
     const dead = readAsPendingPlayer(client);
-    expect(dead.G.pending).toEqual({ kind: 'act', playerId: '0' }); // straight back to the striker
+    expect(dead.G.pending).toMatchObject({ kind: 'act', playerId: '0' }); // straight back to the striker
     expect(dead.G.players['1'].alive).toBe(false);
     expect(dead.G.players['1'].roleRevealed).toBe(true);
     expect(handSize(dead.G.players['1'])).toBe(0);

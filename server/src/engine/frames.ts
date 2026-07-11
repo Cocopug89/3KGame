@@ -194,10 +194,40 @@ export type Frame =
   | { t: 'demandAsk' }
   /** Read G.demand.supplied, clear it, hand it to the demander's resume ctx. */
   | { t: 'demandClose' }
-  // ── primitives (3.1 §4). Three, and only three. ───────────────────────
+  /** Task 3.6's one addition to the demand protocol: the sanctioned mutation
+   * channel for a `demand.open` listener that DEEMS the demand answered
+   * without a card leaving anyone's hand — 八卦阵's judgement becoming a 闪 is
+   * the only Standard user. A CardEffect/SkillTrigger may never mutate G
+   * directly (engine-design §3); this is the {t:'setDamage'}/{t:'retrial'}
+   * pattern's third instance. `cards: []` is a valid DEEMED answer — see
+   * DemandInfo.supplied's own doc comment on why `[]` and `null` are not the
+   * same thing. Asserts a demand is actually open; {t:'demandAsk'} is what
+   * reads the result afterwards and skips asking when it sees non-null. */
+  | { t: 'demandSupply'; cards: CardId[] }
+  // ── primitives (3.1 §4). Three, plus 3.4's two additions below. ────────
   | { t: 'moveCards'; cards: CardId[]; from: Zone; to: Zone; by?: PlayerId }
   | { t: 'draw'; player: PlayerId; count: number }
   | { t: 'skipPhase'; phase: TurnPhase }
+  /** 3.4's reveal-primitive design call (五谷丰登, CONTINUE.md/3.3's handoff):
+   * takes `count` cards off the TOP of the draw pile into the public
+   * G.revealed pool, reshuffling the discard pile in if it runs dry — exactly
+   * like drawTop()/drawCards(), which is why it needs the engine's `rng` and
+   * therefore has to be a primitive rather than something CardEffect.resolve()
+   * does itself (engine-design §3: no rng inside resolve()). Chosen over a
+   * `count`-carrying variant of `moveCards` because `moveCards` always names
+   * the exact ids it's moving — that's what lets an effect return it without
+   * touching G — and a reveal can't know those ids in advance; overloading
+   * `moveCards` to sometimes resolve its own `cards` from `count` would have
+   * split its contract in two depending on which zone it's reading from. */
+  | { t: 'reveal'; count: number }
+  /** The one sanctioned way for a CardEffect to write G.log (F3, docs/
+   * three-kingdoms-plan.md's Phase 3 note) — the `{t:'flag'}` pattern applied
+   * to the log instead of turnFlags: dumb, no conditions, no reading. Effects
+   * push this alongside whatever frame they're narrating (e.g. next to the
+   * `{t:'damage'}` a 决斗 loss produces) rather than mutating G.log directly,
+   * which engine-design §3 forbids. `key`/`params` follow client/src/game/
+   * log.ts's existing vocabulary — reuse a key from there before inventing one. */
+  | { t: 'log'; key: string; params?: Record<string, unknown> }
   // ── phase/turn structure (4.1 §2.2) ───────────────────────────────────
   // A phase is [phase.start trigger, phaseBody]: the body re-reads live state
   // when it pops and does nothing if the phase was skipped *from inside its own*

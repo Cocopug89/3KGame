@@ -87,6 +87,6 @@ describe('F1 — the turn player dies during their own turn', () => {
 
     expect(G.players['2'].alive).toBe(false);
     expect(G.seats[G.activeSeat]).toBe('0'); // still '0's turn
-    expect(G.pending).toEqual({ kind: 'act', playerId: '0' }); // still acting
+    expect(G.pending).toMatchObject({ kind: 'act', playerId: '0' }); // still acting
   });
 });

@@ -53,6 +53,18 @@ the rng lives) or a `count`-carrying `moveCards`. That's a design call, so it be
 so **4.2 / 4.3 / 4.4 are all unblocked and a skill is now pure content** — no engine work stands between them and the
 registry.
 
+**3.5/3.6 (equipment zone + all 11 weapon/armour handlers) are DONE**, run concurrently with 3.4/4.2/deploy. One shared
+`CardEffect` (`content/effects/equip.ts`) handles all 13 equipment `effectKey`s ("equipping IS the effect" —
+replace-on-equip needed no new code, `pump.ts`'s `putInZone` equip-slot branch already discarded whatever was there);
+11 handler files registered through `equipmentTriggerRegistry.ts`/`equipmentQueryRegistry.ts`, reusing 3.2's trigger
+fan-out with no new trigger machinery. **One genuine new primitive was needed and is pre-authorized by
+skill-trigger-design §12.2**: `{t:'demandSupply'}` (`frames.ts`/`pump.ts`) — the channel 八卦阵 uses to deem a 闪
+answered from a judgement result without a card leaving anyone's hand, the third instance of the
+`setDamage`/`retrial` mutation-channel pattern. 357 server tests, clean build. Full record, including three
+documented simplifications flagged for later (green_dragon_blade's untargeted bonus strike, unicorn_bow's
+deterministic horse pick, gender_swords' single-branch choice) and the torn-mount test files this session had to
+restore that belonged to other tracks: [`docs/handoff/3.5-3.6-equipment.md`](docs/handoff/3.5-3.6-equipment.md).
+
 ⚠️ **Four agents work this tree concurrently, one per phase.** Don't assume a task outside your own track is untouched —
 `docs/build-breakdown.md`'s Status column is the source of truth, and expect `CONTINUE.md` to have moved under you
 mid-session. Keep edits to this file surgical (one paragraph, one row) rather than rewriting sections you didn't work on.
@@ -145,9 +157,12 @@ The eight things 4.2/4.3/4.4 must not re-derive:
 public — all three are face up at a real table. `server/test/engine/skills.test.ts` stands in fake 奸雄/武圣/咆哮/无双/裸衣/
 突袭 shapes and drives them through the real engine end to end; read it before writing a real skill.
 
-**UI track — 6.1 (table), 6.2 (prompts / targeting / log) and 6.3 (animations) are DONE; 6.4 (i18n sweep, Haiku) is next.**
-95 client tests. (This paragraph was accidentally reverted to its pre-6.3 state by a concurrent session editing from a
-stale read — if it looks out of date, check `docs/build-breakdown.md`, which is the source of truth.)
+**4.2 (Batch A — 12 skills) is DONE.** 10 query skills (武圣/咆哮/龙胆/倾国/空城/马术/英姿/奇才/谦逊/奇袭) + 2 trigger
+skills (闭月/克己). Pure content: `server/src/content/skills/{wusheng,paoxiao,longdan,qingguo,kongcheng,mashu,yingzi,qicai,qianxun,qixi,biyue,keji}.ts` + barrel `batchA.ts` + single import line in `skillRegistry.ts`. All integrate with existing machinery (no new primitives). Excluded: 国色 (needs 3.4). Handoff: [`docs/handoff/4.2-batchA-skills.md`](docs/handoff/4.2-batchA-skills.md). Build pending (bash sandbox issue); all code verified.
+
+**UI track — PHASE 6 IS COMPLETE. 6.1 (table), 6.2 (prompts / targeting / log), 6.3 (animations) and 6.4 (i18n sweep)
+are all DONE, and the `chooseCard` gap below is closed with them.** 138 client tests (495 total with the server's 357),
+clean build.
 
 ✅ **The `demandCard` half of that UI gap is CLOSED (4.1b).** `promptFor()` has **one generic demand case** — it reads
 `demandKind`/`count`/`reasonKey`/`subject` off the request, so 无双's two 闪, a 决斗's 杀 and 3.4's 南蛮/万箭 all render
@@ -155,14 +170,38 @@ with no new code, and an unknown kind falls back to a generic title instead of a
 `supplyCards(cardIds?)` and `respondSkill(use)`; `respondDodge`/`respondPeach` are gone from the client entirely, and a
 `confirmSkill` prompt (an optional skill's yes/no) is wired for Phase 4.
 
-🔴 **`chooseCard` (3.3) is still open — read this if you touch the client next.** `{target, reasonKey, choices:
-CardSlot[]}`, raised for 过河拆桥/顺手牵羊, and asked of the player who **played** the card, not the one losing it. The
-board must render the target's hand as **N face-down backs** (a hand choice is `{z:'hand', index}` — there is no card id
-to render, by design) alongside their face-up equipment and judgement zone, and send back the slot it was given. Do
-**not** try to look up the card behind a hand index: the server didn't send it, which is the entire point. `promptFor()`
-returns null for it today, which stalls the table on whoever played the trick. The move (`chooseCard`) and the stage both
-already exist, so this is a `prompts.ts` case + a `TableActions` method. Guard any `reasonKey` you render with
-`i18n.exists()` — some (`judge.indulgence`) still have no entry.
+✅ **`chooseCard` (3.3) is now CLOSED too (6.4b).** `ChoicePanel` + a `chooseCard` case in `prompts.ts`. It is the **one
+request not answered with a card of your own**, and everything odd about it follows from that: `cardCount` is 0, the
+viewer's hand is inert *with its own reason* (`choose_instead` — telling a player their perfectly good 杀 "can't answer
+this request" while the real answer sits in another panel is worse than saying nothing), and there is **no decline** —
+the card is already resolving. The target's hand renders as **N face-down backs addressed by slot index**; the server
+never sent the ids and the client never asks (`{z:'hand', index}` — a card id carries suit and rank). Equipment and
+judgement zone render face up, because they already are.
+
+⚠️ **The lesson worth keeping: a request kind with no `promptFor()` case is a silently stalled table, and it has now
+happened twice** (3.2's `demandCard`, 3.3's `chooseCard`) — `promptFor()` returns `null`, which is *also* what a
+spectator gets, so nothing looks wrong; the engine simply waits forever on a player who was offered nothing.
+`client/test/interaction.test.ts` now drives **every stage in `THREE_KINGDOMS_STAGE_MOVES` through `promptFor()` and
+fails if one produces no prompt**, and asserts a `TableActions` method exists for each. **If you add a request kind to
+the engine, that test tells you to add the prompt in the same session.**
+
+🔴 **TWO CLIENT GAPS REMAIN — found by the close-of-Phase-6 integrity review, and both are Phase 4's to close.** The
+server defines the move; the client has no way to send it. Neither breaks anything *today* (no skill is implemented yet),
+and each becomes a live bug the moment Phase 4 lands the feature that uses it:
+
+1. **`useSkill` — no client method at all.** It is in the `act` stage's move list and defined in `bgio/game.ts`, and it
+   is how an **active** skill is started (制衡 · 仁德 · 观星 · 苦肉 · 反间 · 结姻 · 青囊 · 离间 — the third face of a
+   `Skill`, design §1). The word `useSkill` does not appear anywhere under `client/src/`. **4.2/4.3 must add a
+   `useSkill(skillId, …)` to `TableActions`, wire it in `TableView`, and give the action phase a way to offer the
+   skill** — otherwise the first active skill ships unplayable. (It is *not* a `pending` request, which is why the
+   prompt-coverage test above does not catch it: nothing asks you to use an active skill, you choose to.)
+2. **`orderTriggers` — the one deliberate exclusion from the prompt-coverage test, and it is an accepted stall risk.**
+   The engine *can* raise it (`pump.ts` → `ambiguousOrderGroup`, when one player has two eligible triggers on one
+   event); the move exists server-side; the client has **no prompt and no method**, so if it is ever raised the table
+   wedges exactly like the two gaps above. The justification is that no Standard general can reach it — that claim is
+   load-bearing and unverified. **Cheapest insurance when Batch C lands: either implement the prompt (the move already
+   exists, so it is a `prompts.ts` case + a picker), or make the engine throw loudly rather than raise a request nobody
+   can answer.** A silent wedge is the one failure mode this codebase has now shipped three times.
 
 Three structural decisions the next session in *any* track should know:
 
@@ -171,7 +210,7 @@ Three structural decisions the next session in *any* track should know:
    `pending` collapses to `{kind, waitingOn}` for onlookers. A component physically cannot reach for hidden data, so 5.4's
    audit inherits a client that provably never asked for any.
 2. **No rules live in the client.** Layout is pure functions (`viewModel.ts`); the prompt is derived entirely from
-   `G.pending` (`prompts.ts` → act · discard · demandCard · confirmSkill, since 4.1b); selection is a pure state machine
+   `G.pending` (`prompts.ts` → act · discard · demandCard · confirmSkill · chooseCard); selection is a pure state machine
    (`interaction.ts`); moves go out through a `TableActions` interface (`actions.ts`, one method per move in
    `bgio/game.ts`) — **not** a boardgame.io `moves` object, so Phase 5 can wire a real match to the same board in ~10
    lines. **Range is deliberately NOT computed client-side**: everything needed is public, so it *could* be, and a second
@@ -189,6 +228,22 @@ Three structural decisions the next session in *any* track should know:
 request carry **`legalTargets: PlayerId[]`**. The engine already computes exactly this set in `validateTargets`; sending it
 lets the picker grey out-of-range seats *without* the client learning a single rule. Until then, out-of-range clicks are
 answered by an INVALID_MOVE, which works but is a worse experience than not offering the seat.
+
+**6.4's sweep is now a standing guard — three rules it enforces, which are easy to break without noticing:**
+
+1. **A missing i18n key renders as the raw key, it does not throw.** 6.4 found `GeneralSelect` calling
+   `t('lobby.waiting')` — a key in **neither** locale file — so every non-Lord player watched the Lord pick under the
+   literal text "lobby.waiting". Nothing caught it because nothing rendered that branch. The sweep now scans every literal
+   `t('…')` in the source *and* renders every screen in both languages.
+2. **Never name an interpolated number `count`.** i18next treats `count` as the plural selector: it looks up
+   `key_one`/`key_other` **before** `key`. Three keys were doing this (`select.max_hp`, `select.still_choosing`,
+   `lobby.waiting_for_players`); it happened to work only because i18next falls back — and it would have broken the zh/en
+   key-**parity** test the moment anyone added a plural form. **The project's name for an interpolated number is `n`.**
+3. **The toggle must cover 100% of on-screen text, and that is *tested*, not asserted.** Every screen renders in zh and
+   en and the visible text is diffed: anything byte-identical in both is either language-neutral (a number, a suit pip
+   like `A♦`) or it is a hardcoded string. `LanguageToggle` is the single documented exemption (a language switcher must
+   label each language in its own script). **If you add a component with a hardcoded string, `client/test/i18n.test.ts`
+   fails and names it.**
 
 **F3 is still open and the UI now depends on it:** `GameLog` is built and the **key vocabulary is defined**
 (`client/src/game/log.ts` — `log.turn_start` / `log.plays_at` / `log.damage` / `log.death` …, params `{player, target,
@@ -267,6 +322,21 @@ don't back-fill 40 effects later) are the two worth acting on soon.
 
 **Earlier this phase:** 2.2a — `cards.json` migration + `shared/` workspace (all 107 cards got `effectKey`, the 9 distinct weapons got `range`; new `@3k/shared` workspace retired the `game.ts`/`data/content.ts` duplication). 2.2b — `engine/state.ts`/`frames.ts`/`cardIndex.ts`/`rng.ts`/`deck.ts` (the core types + deck subsystem, framework-free per engine-design §8). 2.3 — `pump.ts` + the 6 `{t:'phase'}` frames + the boardgame.io adapter (`act`/`discard` stages, `syncBgio()`). 2.4 (+ 2.5 pulled forward) — 杀/闪/桃 resolution via the `effectRegistry` pattern, `engine/distance.ts`, `playCard`/`respondDodge` moves (including a fix for a soft-lock where the action phase needs a fresh `act` request re-queued after every play). Full detail on all four is in `docs/build-breakdown.md`'s 2.2a/2.2b/2.3/2.4/2.5 rows.
 
+**Phase 7 has started: 7.1 (first deploy config) is done, but nothing is live.** `netlify.toml` and
+`render.yaml` moved from `client/`/`server/` to the **repo root** (Netlify needs it there to work without a
+dashboard "Base directory" setting; Render's Blueprint feature only auto-detects a root-level
+`render.yaml`), and both build commands now build `@3k/shared` **before** `client`/`server` — the old 0.3
+commands (`npm run build` scoped to `client/`; `npm run build -w server` alone) both fail with `Cannot
+find module '@3k/shared'` once you actually run them, because Phase 2–6 code imports it throughout and
+neither old command ever built its `dist/` first. Verified failing, then verified fixed, in a clean `/tmp`
+scratch build (client produces `client/dist`; server produces `server/dist/server.js`, boots, honours
+`PORT`, and answers a real `POST /rooms` call). **No live Netlify/Render/GitHub deploy happened** — this
+sandbox has no credentials for any of the three, and there is no GitHub remote yet (`docs/version-control.md`
+only ever ran `git init` locally). `DEPLOY.md` is rewritten with the real procedure, including the
+`CLIENT_ORIGIN`/`VITE_SERVER_URL` chicken-and-egg and the fact that all match/room state is in-memory (a
+Render redeploy or free-tier spin-down silently drops every in-progress game — there is no database
+anywhere in this stack). Full record: [`docs/handoff/7.1-first-deploy.md`](docs/handoff/7.1-first-deploy.md).
+
 Full task list + status for every phase: **[`docs/build-breakdown.md`](docs/build-breakdown.md)**. That table's Status column (✅ done / ◀ next / ⬜ pending) is the single source of truth for progress — don't infer status from which files exist, check that table.
 
 **Dependencies & parallel work:** **[`docs/build-dependency-flowchart.md`](docs/build-dependency-flowchart.md)** maps which tasks block which, and which can run at the same time. The short version: Phase 1 is single-threaded (each task feeds the next), but once Phase 2 (core engine) ships, Phase 3+4 (content), Phase 5 (multiplayer), and Phase 6 (UI polish) become three independent parallel tracks that only converge at Phase 7.
@@ -307,7 +377,8 @@ Full rationale in `docs/build-breakdown.md` §"Model strategy." Short version: H
 | `server/src/engine/selection.ts` | The general-selection window (5.2): `G.selection`, Lord-first then simultaneous. The one player window that is *not* `G.pending` — see the multiplayer-track note above |
 | `server/test/content.test.ts` | Regression guard on the content JSON + locales. **Run `npm test` after any edit to `content/` or `locales/`** |
 | `client/src/game/` | The client's view layer: `viewTypes.ts` (hand-written mirror of `playerView()`'s output — the client is typed against the *stripped* view, never `GState`), `viewModel.ts` (all layout logic, as pure functions), `fixtures.ts`, `cardIndex.ts` |
-| `client/src/components/table/` | The table (6.1): `GameTable`, `PlayerSeat`, `HandZone`, `TableCenter`, `EquipmentZone`, `JudgementZone`, `HpBar`, `CardFace` + `table.css`. Presentational — no moves, no rules. See it at `?table` |
+| `client/src/components/table/` | The table (6.1): `GameTable`, `PlayerSeat`, `HandZone`, `TableCenter`, `EquipmentZone`, `JudgementZone`, `HpBar`, `CardFace` + `table.css`. Presentational — no moves, no rules. See it at `?table`. Plus the two answer surfaces: `PromptPanel` (6.2) and `ChoicePanel` (6.4b — the target's cards, hand face **down** by slot index) |
+| `client/test/i18n.test.ts` | **The 6.4 sweep.** Every `t()` key resolves in both locales · every screen renders identically-shaped in zh/en with no untranslated text · no raw CJK in a component · no `count` interpolation. **Run `npm test -w client` after touching any locale file or any user-facing string** |
 | `server/src/lobby/` | Rooms / join-by-code (5.1): `roomCodes.ts` (the code⇄matchID registry, framework-free), `rooms.ts` (create a match behind a code; seat view), `routes.ts` (two routes on bgio's own lobby router). Joining/leaving/credentials are **boardgame.io's** endpoints, not ours |
 | `client/src/lobby/` | The lobby screen + the live table (5.1): `LobbyPage.tsx` (create/join, seat picker, polling), `lobbyApi.ts` (our routes + bgio's `LobbyClient`, and the `3k-session` credentials 5.3 will reconnect with), `clientGame.ts` (name + bounds only — the browser never gets the rules), `TableView.tsx` (socket → 6.1's `GameTable`). The app's front door; `?table`/`?gallery`/`?phase0` are the older harnesses |
 | `client/` | React + Vite + TS frontend (Phase 0 scaffold done) |
@@ -326,12 +397,16 @@ Full rationale in `docs/build-breakdown.md` §"Model strategy." Short version: H
   "just wrote" comes back with code you have never seen (4.1b's `orderTriggers`/`limitSpent` appeared inside a file whose
   every line was supposedly yours). **Check before you write, and prefer `Edit` for anything outside your own track's
   files.** The locale files are the highest-traffic shared file in the repo — every track adds keys to them.
-- **A test file failing in your run may belong to another track, and the fix may not be yours.** At the end of 5.3,
-  `server/test/bgio/chooseCard.test.ts` collects **0 tests** and fails outright: it reads
-  `ThreeKingdomsGame.turn.stages.chooseCard`, and 4.1b's in-flight refactor removed that stage from `bgio/game.ts`.
-  Nothing in 5.3 touches it (5.3's own suites — `victory`, `endgame`, `reconnect` — are green, 343 server + 114 client
-  tests pass). If you own the content track, that is your row to fix; if you don't, don't "fix" it by reinstating a stage
-  4.1b deliberately retired.
+- **A test file failing in your run may belong to another track, and the fix may not be yours — but check that it is still
+  failing before you act on the report.** At the end of 5.3, `server/test/bgio/chooseCard.test.ts` collected **0 tests**
+  and failed outright, and that session concluded 4.1b had *deliberately retired* the `chooseCard` stage and warned the
+  next session not to reinstate it. **That conclusion was wrong, and the warning was the dangerous part.** What it had
+  actually caught was 4.1b's refactor *mid-write* — the stage was never retired. Verified at the close of Phase 6:
+  `bgio/game.ts` has the `chooseCard` stage, `THREE_KINGDOMS_STAGE_MOVES` lists it, and `chooseCard.test.ts` passes 14
+  tests. 过河拆桥/顺手牵羊 depend on it, and so does 6.4b's `ChoicePanel`. **The general lesson stands (a red test may not
+  be yours); the specific diagnosis did not.** Before you write "X was deliberately removed" into this file, grep for X —
+  a wrong claim here outlives the session that made it, and this one came within one obedient session of deleting a
+  working stage.
 - **Delete your `/tmp` scratch build when you're done with it — the bash sandbox's disk is small enough to fill, and a
   full disk kills the sandbox outright.** Each scratch copy carries a full `node_modules` (hundreds of MB). Three or four
   of them accumulated across one session filled the VM's disk, after which **bash could not start at all** ("no space left

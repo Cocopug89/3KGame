@@ -91,7 +91,7 @@ describe('过河拆桥 end to end', () => {
     expect(G.players['1'].hand).toEqual(['strike_2c']);
     expect(G.discardPile).toContain('peach_3h');
     expect(G.discardPile).toContain('dismantle_3c'); // the trick itself
-    expect(G.pending).toEqual({ kind: 'act', playerId: '0' }); // action phase resumes
+    expect(G.pending).toMatchObject({ kind: 'act', playerId: '0' }); // action phase resumes
   });
 
   it('can rip a delayed trick out of the judgement zone', () => {
@@ -158,7 +158,7 @@ describe('无中生有 end to end', () => {
 
     expect(G.players['0'].hand).toEqual(['dodge_2h1', 'dodge_2h2']);
     expect(G.drawPile).toEqual(['dodge_3d']);
-    expect(G.pending).toEqual({ kind: 'act', playerId: '0' });
+    expect(G.pending).toMatchObject({ kind: 'act', playerId: '0' });
   });
 });
 
@@ -183,7 +183,7 @@ describe('the 无懈可击 window wraps all three for free', () => {
 
     // Chain is odd ⇒ the effect is cancelled: no chooseCard request was ever
     // raised, and '1' still holds everything but the 无懈可击 they spent.
-    expect(G.pending).toEqual({ kind: 'act', playerId: '0' });
+    expect(G.pending).toMatchObject({ kind: 'act', playerId: '0' });
     expect(G.players['1'].hand).toEqual(['strike_2c', 'peach_3h']);
     expect(G.players['1'].equipment.weapon).toBe('zhuge_crossbow_ac');
     expect(G.discardPile).toContain('nullification_js');

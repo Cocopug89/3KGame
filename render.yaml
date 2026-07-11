@@ -1,0 +1,54 @@
+# Render config for the server — task 7.1 (first real deploy).
+#
+# Lives at the REPO ROOT: this is where Render's Blueprint feature ("New +" →
+# "Blueprint") looks for render.yaml automatically. (Previously at
+# server/render.yaml, where a Blueprint deploy would never have found it —
+# only a fully manual dashboard setup, which DEPLOY.md documents as the
+# primary path, would have worked. Both paths are documented below.)
+#
+# type: web (not a static site, not a background worker, not a cron job) is
+# load-bearing. boardgame.io's server holds two things that need a real,
+# persistent, long-running process, not a serverless/edge function:
+#   1. A socket.io WebSocket server — every move in this game rides one
+#      persistent connection per player, not a request/response call.
+#   2. In-memory match + room-code state (server/src/lobby/roomCodes.ts,
+#      boardgame.io's own default match store) — there is nowhere else for
+#      an in-progress game to live. This also means a redeploy or a free-tier
+#      spin-down DROPS every in-progress match; see DEPLOY.md.
+# Render's free "Web Service" tier is exactly a persistent Node process
+# behind a stable URL, which is what both of those need.
+services:
+  - type: web
+    name: three-kingdoms-kill-server
+    env: node
+    plan: free
+    # This repo is an npm-workspaces monorepo. Render must install from the
+    # REPO ROOT (so the three workspaces resolve against one lockfile) but
+    # build and start the SERVER workspace specifically.
+    rootDir: .
+    # `shared` must build BEFORE `server` — verified failing otherwise (a
+    # clean scratch build of `npm ci && npm run build -w server` alone fails
+    # with "Cannot find module '@3k/shared'": server/src imports it by
+    # package name, and only shared's own `tsc` run produces the dist/ that
+    # resolves to). The previous render.yaml built server alone and would
+    # have failed on Render's very first deploy.
+    buildCommand: npm ci && npm run build -w shared && npm run build -w server
+    startCommand: npm start -w server
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Pin the Node version for the same reason as netlify.toml's
+      # NODE_VERSION — don't let a platform default change the build.
+      - key: NODE_VERSION
+        value: "20"
+      # PORT is injected by Render — do not add it here. server.ts already
+      # reads process.env.PORT and falls back to 3000 only for local dev.
+      # Hardcoding it is the classic Render "no open ports detected" failure.
+      - key: CLIENT_ORIGIN
+        # Set to the deployed Netlify URL, e.g.
+        #   https://three-kingdoms-kill-abc123.netlify.app
+        # Without it the server's origin allowlist (server/src/server.ts)
+        # rejects the browser's WebSocket handshake AND the /rooms REST
+        # calls (same Koa router, same CORS config) — every connection from
+        # the deployed client fails. See DEPLOY.md's troubleshooting table.
+        sync: false
