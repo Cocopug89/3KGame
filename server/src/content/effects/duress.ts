@@ -45,7 +45,9 @@ export const duress: CardEffect = {
       if (!holder?.alive || !holder.equipment.weapon) return []; // re-check: no longer holds a weapon
       if (!inAttackRange(G, target1, target2)) return []; // re-check: the pairwise range constraint
 
+      const playedCards = ctx.cards as CardId[];
       return [
+        { t: 'log', key: 'log.plays_at', params: { player: source, card: playedCards[0], target: target1 } },
         {
           t: 'demand',
           kind: 'strike',
@@ -65,7 +67,10 @@ export const duress: CardEffect = {
       // any other 杀 (strike.ts). The card was already discarded by the
       // demand's supplyCards move; replaying it as a {t:'play'} doesn't need
       // it back in target1's hand.
-      return [{ t: 'play', source: target1, cards: supplied, targets: [target2], effectKey: 'strike' }];
+      return [
+        { t: 'log', key: 'log.responds', params: { player: target1, card: supplied[0] } },
+        { t: 'play', source: target1, cards: supplied, targets: [target2], effectKey: 'strike' },
+      ];
     }
 
     // Refused, or couldn't answer — the weapon changes hands.
@@ -80,6 +85,7 @@ export const duress: CardEffect = {
         to: { z: 'hand', player: source },
         by: source,
       },
+      { t: 'log', key: 'log.card_taken', params: { player: source, target: target1, card: weapon } },
     ];
   },
 };

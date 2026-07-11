@@ -55,6 +55,7 @@ export const indulgence: CardEffect = {
     const target = (ctx.targets as PlayerId[])[0];
     const card = (ctx.cards as CardId[])[0];
     return [
+      { t: 'log', key: 'log.plays_at', params: { player: source, card, target } },
       {
         t: 'moveCards',
         cards: [card],

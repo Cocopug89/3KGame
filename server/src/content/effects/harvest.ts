@@ -87,6 +87,7 @@ export const harvest: CardEffect = {
     if (!ctx.revealed) {
       // Step 1: ONE window for the whole card, guarding the reveal itself.
       return [
+        { t: 'log', key: 'log.plays', params: { player: source, card: ctx.cards[0] } },
         nullifyWindowFrame(
           {
             t: 'effect',
@@ -106,6 +107,7 @@ export const harvest: CardEffect = {
       const order = pickOrderFrom(G, source);
       return [
         { t: 'reveal', count: livingCount },
+        { t: 'log', key: 'log.reveals', params: { player: source, n: livingCount } },
         {
           t: 'resume',
           effectKey: 'harvest',
@@ -167,6 +169,7 @@ export const harvest: CardEffect = {
     const frames: Frame[] = [];
     if (chosen && from) {
       frames.push({ t: 'moveCards', cards: [chosen], from, to: { z: 'hand', player: picker }, by: picker });
+      frames.push({ t: 'log', key: 'log.picks', params: { player: picker, card: chosen } });
     }
     frames.push({
       t: 'effect',

@@ -44,6 +44,7 @@ export const lightning: CardEffect = {
     const source = ctx.source as PlayerId;
     const card = (ctx.cards as CardId[])[0];
     return [
+      { t: 'log', key: 'log.plays', params: { player: source, card } },
       {
         t: 'moveCards',
         cards: [card],

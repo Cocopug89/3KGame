@@ -8,7 +8,7 @@
 // simplification this card inherits too.
 
 import type { CardEffect } from '../effectTypes.js';
-import type { PlayerId } from '../../engine/state.js';
+import type { CardId, PlayerId } from '../../engine/state.js';
 
 export const peachGarden: CardEffect = {
   key: 'peach_garden',
@@ -24,8 +24,11 @@ export const peachGarden: CardEffect = {
   canPlay: () => true,
 
   resolve: (_G, ctx) => {
+    const source = ctx.source as PlayerId;
+    const cards = ctx.cards as CardId[];
     const target = (ctx.targets as PlayerId[])[0];
     return [
+      { t: 'log', key: 'log.plays_at', params: { player: source, card: cards[0], target } },
       { t: 'heal', target, amount: 1 },
       { t: 'log', key: 'log.heal', params: { target, n: 1 } },
     ];
