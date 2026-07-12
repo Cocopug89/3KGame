@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { Client } from 'boardgame.io/dist/cjs/client.js';
 import { ThreeKingdomsGame } from '../../src/bgio/game.js';
-import type { PlayerId } from '../../src/engine/state.js';
+import type { GState, PlayerId } from '../../src/engine/state.js';
 
 interface SelectionView {
   lord: PlayerId;
@@ -55,6 +55,83 @@ function selectingClient(numPlayers = 4): BgClient {
   const game = {
     ...ThreeKingdomsGame,
     setup: (fnCtx: unknown) => realSetup(fnCtx, { selectGenerals: true }),
+  };
+  const client = Client({ game, numPlayers }) as unknown as BgClient;
+  client.start();
+  return client;
+}
+
+/**
+ * Generals whose turn is ORDINARY — nobody in this list replaces or modifies the
+ * start of their own turn.
+ *
+ * Five of the twenty-five do, and any of them landing on the Lord changes what
+ * turn 1 even looks like:
+ *
+ *   • 诸葛亮 观星 and 甄姬 洛神 fire on `phase.start(prep)`
+ *   • 张辽 突袭 and 许褚 裸衣 fire on the DRAW phase — 突袭 replaces it outright
+ *   • 周瑜 英姿 is a 锁定技 +1 to it
+ *
+ * The first four are optional, so the engine raises a `confirmSkill` and BLOCKS —
+ * before the Lord has drawn anything. The table is then sitting at hand 4 with a
+ * pending that isn't 'act', which is correct engine behaviour and has nothing to
+ * do with selection.
+ *
+ * And that is the point of this list. The general deal here is REAL and unseeded,
+ * and `everyonePicks` takes each player's FIRST candidate — so before task 4.4
+ * gave Standard generals real turn-start skills, the turn-1 assertions below were
+ * deterministic by luck. Afterwards they became a ~20% coin flip on whichever
+ * general the RNG happened to deal the Lord. Pinning the candidate deal (the same
+ * trick test/bgio/game.test.ts's riggedClient plays with the CARD deal: the real
+ * setup runs, then the deal is fixed) makes turn 1 ordinary on purpose instead of
+ * by chance — without touching the window under test.
+ */
+const ORDINARY_GENERALS = [
+  'cao_cao',
+  'sima_yi',
+  'xiahou_dun',
+  'guo_jia',
+  'guan_yu',
+  'zhang_fei',
+  'zhao_yun',
+  'ma_chao',
+  'huang_yueying',
+  'sun_quan',
+  'gan_ning',
+  'huang_gai',
+  'da_qiao',
+  'lu_xun',
+  'sun_shangxiang',
+  'hua_tuo',
+  'lu_bu',
+  'liu_bei',
+];
+
+/**
+ * The real selection window with a pinned candidate deal. Pool SIZES are left
+ * exactly as the real dealer set them (the Lord's wider pool, and its shrink at 8
+ * players) — only *which* generals are on offer is fixed, so nothing this file
+ * asserts about the window itself is faked.
+ */
+function dealtClient(numPlayers: number): BgClient {
+  const game = {
+    ...ThreeKingdomsGame,
+    setup: (fnCtx: unknown) => {
+      const G = realSetup(fnCtx, { selectGenerals: true }) as GState;
+      const selection = G.selection;
+      if (!selection) throw new Error('dealtClient: setup did not open a selection window');
+
+      const pool = [...ORDINARY_GENERALS];
+      const order = [selection.lord, ...G.seats.filter((id) => id !== selection.lord)];
+      for (const id of order) {
+        const size = selection.candidates[id].length; // whatever the real dealer decided
+        if (pool.length < size) {
+          throw new Error(`dealtClient: not enough ordinary generals for ${numPlayers} players`);
+        }
+        selection.candidates[id] = pool.splice(0, size);
+      }
+      return G;
+    },
   };
   const client = Client({ game, numPlayers }) as unknown as BgClient;
   client.start();
@@ -180,7 +257,11 @@ describe('general selection through boardgame.io', () => {
   });
 
   it('deals the table and starts turn 1 with the Lord once the last player picks', () => {
-    const client = selectingClient(5);
+    // dealtClient, not selectingClient: this is the one test that plays ON past
+    // the window into turn 1, so it is the one test the general RNG can flip (see
+    // ORDINARY_GENERALS). Everything it asserts about *selection* is still the
+    // real thing.
+    const client = dealtClient(5);
     const lord = lordOf(client); // read it *before* the window closes
     const picks = everyonePicks(client);
 

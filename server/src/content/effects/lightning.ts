@@ -74,8 +74,14 @@ export const lightningResult: CardEffect = {
     ];
 
     if (hit) {
-      frames.push({ t: 'damage', source: null, target, amount: 3, kind: 'thunder' });
-      frames.push({ t: 'log', key: 'log.damage', params: { target, n: 3, source: null } });
+      // The discard goes BEFORE the damage frame, not after (7.2's bot soak
+      // found the other order): 3 thunder damage can kill the holder, and
+      // resolveDeath sweeps their judgement zone into the discard pile — a
+      // moveCards frame queued behind the damage then pops against a zone the
+      // card has already left and throws. moveCards has no subject, so the
+      // dead-subject rule can't drop it. The card's final position is the
+      // discard pile either way, and no Standard skill listens to a
+      // judgement-zone card.lost, so nothing observable moves but the crash.
       if (sourceCard) {
         frames.push({
           t: 'moveCards',
@@ -84,6 +90,8 @@ export const lightningResult: CardEffect = {
           to: { z: 'discard' },
         });
       }
+      frames.push({ t: 'damage', source: null, target, amount: 3, kind: 'thunder' });
+      frames.push({ t: 'log', key: 'log.damage', params: { target, n: 3, source: null } });
       return frames;
     }
 

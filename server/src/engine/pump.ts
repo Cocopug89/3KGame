@@ -31,12 +31,13 @@ import { resolvePhase, resolvePhaseBody, endTurn } from './phases.js';
 import { askerAtOffset, deathConsequenceFrames, resolveDeath } from './dying.js';
 import { checkVictory } from './victory.js';
 import { drawCards, drawTop, shuffleDeck } from './deck.js';
-import { ambiguousOrderGroup, fanOut, findTrigger } from './triggers.js';
+import { ambiguousOrderGroup, collectListeners, fanOut, findTrigger } from './triggers.js';
 import { limitSpent, spendLimit } from './limits.js';
 import { cardsAs, demandCount } from './queries.js';
 import { getCard } from './cardIndex.js';
 import { pushFrames, applyToResumeFrame } from './stack.js';
 import { legalTargetsForHand } from './legalTargets.js';
+import { resolveSlot, type CardSlot } from './cardChoice.js';
 import { effectRegistry } from '../content/effectRegistry.js';
 import { skillRegistry } from '../content/skillRegistry.js';
 import { nullifyWindowFrame } from '../content/effects/nullifyWindow.js';
@@ -65,6 +66,7 @@ function subjectOf(frame: Frame): PlayerId | null {
       return frame.req.playerId;
     case 'damage':
     case 'heal':
+    case 'loseHp':
     case 'judge':
     case 'judgeResult':
       return frame.target;
@@ -198,38 +200,51 @@ function takeFromZone(G: GState, zone: Zone, cards: readonly CardId[]): void {
   }
 }
 
-function putInZone(G: GState, zone: Zone, cards: readonly CardId[]): void {
+/**
+ * Returns any card BUMPED OUT of the destination as a side effect (only
+ * possible for 'equip': occupying a slot that already held something discards
+ * the old occupant — plan §3.3). Task 4.3's fix: this used to be a silent
+ * `G.discardPile.push`, so a replaced weapon/armour/horse never emitted
+ * `card.lost` — harmless until 枭姬 ("lose an equipped card ⇒ draw 2") became
+ * the first listener that needed to hear it. The 'moveCards' case below turns
+ * this return value into a second `cardLostFrame`.
+ */
+function putInZone(G: GState, zone: Zone, cards: readonly CardId[]): CardId[] {
   switch (zone.z) {
     case 'hand':
       G.players[zone.player].hand.push(...cards);
-      return;
+      return [];
     case 'equip': {
       const player = G.players[zone.player];
+      const replaced: CardId[] = [];
       for (const id of cards) {
         const slot = slotFor(id);
-        const replaced = player.equipment[slot];
+        const old = player.equipment[slot];
         // Equipping into an occupied slot discards what was there (plan §3.3).
-        if (replaced) G.discardPile.push(replaced);
+        if (old) {
+          G.discardPile.push(old);
+          replaced.push(old);
+        }
         player.equipment[slot] = id;
       }
-      return;
+      return replaced;
     }
     case 'judgementZone':
       G.players[zone.player].judgementZone.push(...cards);
-      return;
+      return [];
     case 'discard':
       G.discardPile.push(...cards);
-      return;
+      return [];
     case 'drawPile':
       G.drawPile.unshift(...cards); // index 0 = top (state.ts)
-      return;
+      return [];
     case 'revealed':
       // Symmetry with takeFromZone's case, above — nothing in 3.4 actually
       // moves a card INTO 'revealed' via moveCards (the {t:'reveal'} primitive
       // populates it directly), but a future effect reusing the pool has
       // somewhere correct to land.
       G.revealed.push(...cards);
-      return;
+      return [];
   }
 }
 
@@ -268,7 +283,7 @@ export function resolve(frame: Frame, G: GState, rng: RNG): void {
       G.turnFlags[frame.key] = frame.value;
       return;
 
-    case 'request':
+    case 'request': {
       // A frame that needs a player decision sets G.pending and stops; the
       // frame that pushed this one is responsible for also pushing whatever it
       // needs to resume once the answer comes in (docs/engine-design.md §2).
@@ -279,11 +294,50 @@ export function resolve(frame: Frame, G: GState, rng: RNG): void {
       // same pushFrames batch, e.g. 无中生有's draw, has already happened by
       // the time this pops) rather than a snapshot taken when the frame was
       // constructed. engine/legalTargets.ts has the full reasoning.
-      G.pending =
-        frame.req.kind === 'act'
-          ? { ...frame.req, legalTargets: legalTargetsForHand(G, frame.req.playerId) }
-          : frame.req;
+      if (frame.req.kind === 'act') {
+        G.pending = { ...frame.req, legalTargets: legalTargetsForHand(G, frame.req.playerId) };
+        return;
+      }
+
+      // ── 7.2's first soak finding: THE SAME RULE, FOR chooseCard ────────────
+      //
+      // A multi-round discard (刚烈's two cards, 寒冰剑's two, 贯石斧's two) returns
+      // BOTH the {t:'moveCards'} for the card just picked AND the next
+      // {t:'request'} from ONE resolve() call — and resolve() may never mutate G
+      // (engine-design §3), so it builds those `choices` against a hand that has
+      // NOT yet lost the card it is about to lose. By the time this frame pops,
+      // the moveCards HAS applied, and the slots are stale: they describe the
+      // old hand.
+      //
+      // Usually harmless (one extra, unresolvable slot at the end). Fatal when
+      // the victim holds exactly ONE card: round two offers slot 0, slot 0 now
+      // resolves to nothing, EVERY answer is INVALID_MOVE — and the table hangs
+      // forever on a request nobody can answer. The 7.2 bot soak found this in
+      // its first run; no unit test could, because each one exercises a single
+      // resolve() and the staleness only exists BETWEEN a resolve() and its
+      // frames being applied.
+      //
+      // Fixed here rather than in the three effects, for U1's exact reason: the
+      // pusher cannot know what will be true at pop time, so it must not be the
+      // one to decide. Re-validating against live state also silently repairs the
+      // index shift (a hand's slots are always the contiguous range 0..n-1, so
+      // dropping the unresolvable ones leaves exactly the right set), and NO
+      // choices left means there is nothing to point at — so do not ask at all.
+      // The resume frame underneath then runs with no `chosen`, which every one
+      // of these effects already handles ("nothing left to take — stop early,
+      // not an error").
+      if (frame.req.kind === 'chooseCard') {
+        const target = frame.req.target as PlayerId;
+        const offered = (frame.req.choices ?? []) as CardSlot[];
+        const live = offered.filter((slot) => resolveSlot(G, target, slot) !== null);
+        if (live.length === 0) return; // nothing to point at — skip the request
+        G.pending = { ...frame.req, choices: live };
+        return;
+      }
+
+      G.pending = frame.req;
       return;
+    }
 
     case 'play': {
       const ctx: EffectCtx = { source: frame.source, cards: frame.cards, targets: frame.targets };
@@ -449,6 +503,22 @@ export function resolve(frame: Frame, G: GState, rng: RNG): void {
       return;
     }
 
+    // ── non-damage HP loss (task 4.3 — 苦肉) ────────────────────────────────
+    // Deliberately NOT the {t:'damage'} two-step window: see frames.ts's
+    // comment on 'loseHp'. Still opens the dying window at 0 hp, exactly like
+    // 'damage' step 2 — that check is about being AT 0 hp, not about how you
+    // got there.
+    case 'loseHp': {
+      const target = G.players[frame.target];
+      target.hp -= frame.amount;
+      if (target.hp <= 0) {
+        pushFrames(G, [
+          { t: 'dying', target: frame.target, asker: frame.target, offset: 0, killer: null },
+        ]);
+      }
+      return;
+    }
+
     // ── judgement (docs/judgement-nullification-design.md §1) ─────────────
 
     case 'judge': {
@@ -524,7 +594,11 @@ export function resolve(frame: Frame, G: GState, rng: RNG): void {
       // it must never be resolved silently by registration order, because that
       // is a rules bug that first shows up in an expansion, when nobody
       // remembers this code.
-      const ambiguous = ambiguousOrderGroup(G, frame.ev, frame.order);
+      // One collect-and-sort shared by the ambiguity check and the fan-out —
+      // nothing between the two calls mutates G, so the snapshots would be
+      // identical anyway.
+      const listeners = collectListeners(G, frame.ev, frame.order);
+      const ambiguous = ambiguousOrderGroup(G, frame.ev, frame.order, listeners);
       if (ambiguous) {
         G.stack.push({
           t: 'request',
@@ -538,7 +612,7 @@ export function resolve(frame: Frame, G: GState, rng: RNG): void {
         });
         return; // the orderTriggers move re-pushes this fan-out with the answer
       }
-      pushFrames(G, fanOut(G, frame.ev, frame.order));
+      pushFrames(G, fanOut(G, frame.ev, frame.order, listeners));
       return;
     }
 
@@ -682,10 +756,14 @@ export function resolve(frame: Frame, G: GState, rng: RNG): void {
 
     case 'moveCards': {
       takeFromZone(G, frame.from, frame.cards);
-      putInZone(G, frame.to, frame.cards);
+      const bumped = putInZone(G, frame.to, frame.cards);
       const frames: Frame[] = [];
       if (frame.from.z === 'hand' || frame.from.z === 'equip' || frame.from.z === 'judgementZone') {
         frames.push(cardLostFrame(frame.from.player, frame.cards, frame.from.z));
+      }
+      // A replaced piece of equipment is lost too — 枭姬's listener (task 4.3).
+      if (bumped.length > 0 && frame.to.z === 'equip') {
+        frames.push(cardLostFrame(frame.to.player, bumped, 'equip'));
       }
       if (frame.to.z === 'hand') {
         frames.push({

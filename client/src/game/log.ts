@@ -50,6 +50,12 @@ export const LOG_KEYS = [
   'log.kill_penalty', // {player}            — the Lord killed a Loyalist (5.3)
   'log.game_over', // {role}                 — the winning side (5.3)
   'log.card_taken', // {player, target, card} — a card changes hands outside a discard (3.4's 借刀杀人)
+  // {player, target} — the SAME event when the card came out of a hidden HAND
+  // (反馈, 突袭). Deliberately card-less: naming it in the public log would tell
+  // the whole table a card only the taker is entitled to know
+  // (docs/anti-cheat-audit.md, task 5.4's one real finding). Never "fix" this by
+  // adding {{card}} back.
+  'log.card_taken_hidden',
   'log.reveals', // {player, n}             — N cards revealed face-up off the draw pile (3.4's 五谷丰登)
   'log.picks', // {player, card}            — a player takes one of the revealed cards (3.4's 五谷丰登)
 ] as const;

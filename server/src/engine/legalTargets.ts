@@ -80,8 +80,31 @@ export function legalTargetsForCard(G: GState, self: PlayerId, cardId: CardId): 
 export function legalTargetsForHand(G: GState, playerId: PlayerId): Record<CardId, PlayerId[]> {
   const hand = G.players[playerId]?.hand ?? [];
   const out: Record<CardId, PlayerId[]> = {};
+  // Two copies of the same card (30× 杀) share an effectKey, and
+  // legalTargetsForCard reads nothing else off the card — so their target
+  // lists are identical by construction. Compute each distinct effectKey once.
+  // This is scoped to this single call (one G snapshot), NOT the cross-call
+  // caching queries.ts forbids: every 'act' request still recomputes fresh.
+  const byEffectKey = new Map<string, PlayerId[]>();
   for (const cardId of hand) {
-    if (!(cardId in out)) out[cardId] = legalTargetsForCard(G, playerId, cardId);
+    if (cardId in out) continue;
+    let effectKey: string | undefined;
+    try {
+      effectKey = getCard(cardId).effectKey;
+    } catch {
+      // Throwaway test ids ('a', 'b'…) — same degrade-to-empty call
+      // legalTargetsForCard makes.
+    }
+    if (effectKey === undefined) {
+      out[cardId] = [];
+      continue;
+    }
+    let targets = byEffectKey.get(effectKey);
+    if (!targets) {
+      targets = legalTargetsForCard(G, playerId, cardId);
+      byEffectKey.set(effectKey, targets);
+    }
+    out[cardId] = targets;
   }
   return out;
 }

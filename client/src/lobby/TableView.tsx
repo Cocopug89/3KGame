@@ -41,6 +41,17 @@ function tableActions(moves: Moves): TableActions {
     // (engine/cardChoice.ts's resolveSlot), so a hand-crafted slot is an
     // INVALID_MOVE rather than a leak.
     chooseCard: (slot) => moves.chooseCard(slot),
+    // Batch B/C (4.3, 4.4). THIS is the adapter that matters: a prompt with no
+    // move behind it here is a table that hangs in a real match, no matter how
+    // well the panel renders. The names are @3k/shared's THREE_KINGDOMS_STAGE_MOVES
+    // — boardgame.io dispatches by name, so a typo is silently a no-op.
+    chooseOption: (optionId) => moves.chooseOption(optionId),
+    choosePlayer: (playerId) => moves.choosePlayer(playerId),
+    declareSuit: (suit) => moves.declareSuit(suit),
+    arrangeCards: (order) => moves.arrangeCards(order),
+    submitRetrial: (cardId) => moves.submitRetrial(cardId),
+    distributeCards: (assignments) => moves.distributeCards(assignments),
+    redirectStrike: (cardId, newTarget) => moves.redirectStrike(cardId, newTarget),
   };
 }
 

@@ -105,9 +105,23 @@ describe('i18n sweep · every key the code asks for exists', () => {
     // have caught 3.2's demandCard arriving with no strings at all.
     const base = FIXTURES[0].state;
     // Every stage the engine can block on (4.1b deleted respondDodge/respondPeach
-    // into demandCard; 3.3 added chooseCard). orderTriggers is excluded because
-    // no Standard general can reach it — see interaction.test.ts.
-    const kinds = ['act', 'discard', 'demandCard', 'confirmSkill', 'chooseCard'];
+    // into demandCard; 3.3 added chooseCard; 4.3/4.4 added the last seven).
+    // orderTriggers is excluded because no Standard general can reach it — see
+    // interaction.test.ts.
+    const kinds = [
+      'act',
+      'discard',
+      'demandCard',
+      'confirmSkill',
+      'chooseCard',
+      'chooseOption',
+      'choosePlayer',
+      'declareSuit',
+      'guanxing',
+      'guicaiRetrial',
+      'yijiDistribute',
+      'liuliRedirect',
+    ];
     const missing: string[] = [];
 
     for (const kind of kinds) {

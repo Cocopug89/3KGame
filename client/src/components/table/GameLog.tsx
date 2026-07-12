@@ -1,6 +1,12 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLogLine } from '../../game/log';
 import type { TableState } from '../../game/viewTypes';
+
+/** A long match logs thousands of entries; the panel is a "what just
+ * happened" readout, not an archive, and re-rendering an unbounded <ol> on
+ * every snapshot is the cost. Raise if a scrollback UI ever wants more. */
+const MAX_LOG_ENTRIES = 100;
 
 /**
  * The game log (task 6.2). Renders `G.log` — a list of `{key, params}`, never
@@ -16,7 +22,10 @@ import type { TableState } from '../../game/viewTypes';
 export function GameLog({ state }: { state: TableState }) {
   const { t } = useTranslation();
   const line = useLogLine(state);
-  const entries = [...state.log].reverse();
+  // slice() already copies, so reverse() is safe; memoised because the board
+  // re-renders on every snapshot and selection click, not just when a log
+  // entry lands.
+  const entries = useMemo(() => state.log.slice(-MAX_LOG_ENTRIES).reverse(), [state.log]);
 
   return (
     <div className="log">

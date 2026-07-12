@@ -43,10 +43,21 @@ function makeEvents() {
 }
 
 /** Two adjacent seats (distance 1), no weapons — default attack range 1
- * covers exactly this, so '1' is always a legal strike target of '0'. */
+ * covers exactly this, so '1' is always a legal strike target of '0'.
+ *
+ * generalId is overridden away from makePlayer's cao_cao default: these
+ * tests exercise playCard/supplyCards mechanics generically and must stay
+ * decoupled from any particular general's skills (4.4: cao_cao's own 奸雄
+ * went live and started asking confirmSkill after these strikes land,
+ * which these tests predate). 'test_none' matches no id in generals.json,
+ * so skillSource.ts's `skillsOfPlayer` returns [] for it — no triggers,
+ * ever, no matter what lands later. */
 function twoPlayerActState(overrides: Partial<GState> = {}): GState {
   return makeGState({
-    players: { '0': makePlayer('0'), '1': makePlayer('1') },
+    players: {
+      '0': makePlayer('0', { generalId: 'test_none' }),
+      '1': makePlayer('1', { generalId: 'test_none' }),
+    },
     seats: ['0', '1'],
     pending: { kind: 'act', playerId: '0' },
     ...overrides,

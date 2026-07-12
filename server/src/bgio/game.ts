@@ -32,6 +32,7 @@ import type { CardEffect, TargetSpec } from '../content/effectTypes.js';
 import { activeEffectKey, skillRegistry } from '../content/skillRegistry.js';
 import { skillsOfPlayer } from '../content/skillSource.js';
 import { makeRng, type BgioRandomLike } from './rng.js';
+import { playerView } from './playerView.js';
 
 export interface ThreeKingdomsSetupData {
   /** Run the real general-selection window first (task 5.2): roles are dealt,
@@ -106,83 +107,12 @@ function syncBgio(
   }
 }
 
-/**
- * F2 (docs/phase-2-review.md), fixed in 4.1b: `playerView` used to spread every
- * player's whole `flags` object to every client, though engine-design §6 says
- * only `pub.*` keys are public. It was harmless only for as long as `flags`
- * stayed empty — so the filter goes in NOW, before the first skill that ever
- * needs per-player state can leak it by default.
- *
- * (Skill state through Phase 4 is turn-scoped and lives in G.turnFlags, which
- * IS public — a turn flag records something the table watched happen: 裸衣's
- * choice, 仁德's gifts, which limits have been spent. PlayerState.flags stays
- * empty; this is the guard rail for whatever fills it first.)
- */
-function publicFlags(flags: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(flags).filter(([key]) => key.startsWith('pub.')));
-}
-
-/** playerView per docs/engine-design.md §6. This is a good-faith first pass
- * (drawPile/stack deleted, other players' hands/roles stripped, non-pub flags
- * filtered) — the formal anti-cheat audit is task 5.4; don't treat this as
- * cleared until then.
- *
- * G.damage, G.demand and G.judgement are deliberately PUBLIC: all three are
- * face up at a real table (a 杀 landing, a player being asked for a 闪, a
- * flipped judgement card), and 5.4 should confirm exactly that and nothing
- * more. */
-/** What a client may know about the general-selection window (task 5.2):
- * their own candidates, who is still choosing — and the Lord's pick, which is
- * public the moment it's made (they pick first, in the open). Everyone else's
- * pick stays hidden until selection ends and the generals go on the table, so
- * nobody can tailor their own choice to a pick that hasn't been revealed. */
-function selectionView(G: GState, playerID: PlayerId | null) {
-  const selection = G.selection;
-  if (!selection) return null;
-  const { lord, awaiting } = selection;
-  return {
-    lord,
-    awaiting,
-    candidates: playerID && selection.candidates[playerID] ? selection.candidates[playerID] : [],
-    /** Locked in already — the fact, not the choice. */
-    lockedIn: Object.keys(selection.picked),
-    lordGeneralId: selection.picked[lord] ?? null,
-    myPick: playerID ? (selection.picked[playerID] ?? null) : null,
-  };
-}
-
-function playerView({ G, playerID }: { G: GState; playerID: PlayerId | null }) {
-  const { drawPile, stack: _stack, selection: _selection, ...publicG } = G;
-
-  const players: Record<string, unknown> = {};
-  for (const [id, p] of Object.entries(G.players)) {
-    if (id === playerID) {
-      players[id] = p;
-      continue;
-    }
-    const { hand, role, flags, ...restOfPlayer } = p;
-    players[id] = {
-      ...restOfPlayer,
-      flags: publicFlags(flags),
-      handCount: hand.length,
-      ...(p.roleRevealed ? { role } : {}),
-    };
-  }
-
-  const pending = !G.pending
-    ? null
-    : G.pending.playerId === playerID
-      ? G.pending
-      : { waitingOn: G.pending.playerId, kind: G.pending.kind };
-
-  return {
-    ...publicG,
-    drawPileCount: drawPile.length,
-    players,
-    pending,
-    selection: selectionView(G, playerID),
-  };
-}
+// playerView — THE anti-cheat surface — now lives in its own file (task 5.4,
+// docs/anti-cheat-audit.md). It was extracted, not changed: a boundary that
+// decides what leaves the server should be a file you can open, grep and test on
+// its own, and `server/test/bgio/playerView.test.ts` is the regression suite that
+// tries to read a secret out of it. The rule it enforces is engine-design §6's:
+// **delete hidden zones, never mask them.**
 
 /**
  * Generic, data-driven target validation against a CardEffect's TargetSpec
@@ -437,6 +367,13 @@ export const ThreeKingdomsGame: Game<GState, Record<string, unknown>, ThreeKingd
             if (!Array.isArray(cardIds) || new Set(cardIds).size !== cardIds.length) {
               return INVALID_MOVE;
             }
+            // 4.4: an exact-cost active skill (结姻 discards 2, 离间 discards 1)
+            // rejects any other count here, the same generic way activeLimit is
+            // checked below — one property true of the whole skill, not a
+            // skill-specific `if` hidden in this move.
+            if (skill.activeCardCount !== undefined && cardIds.length !== skill.activeCardCount) {
+              return INVALID_MOVE;
+            }
             const hand = G.players[playerID]?.hand ?? [];
             if (!cardIds.every((id) => hand.includes(id))) return INVALID_MOVE;
             if (!active.canPlay(G, playerID)) return INVALID_MOVE;
@@ -652,6 +589,58 @@ export const ThreeKingdomsGame: Game<GState, Record<string, unknown>, ThreeKingd
           },
         },
       },
+      // Task 4.3's two generic additions — a trigger's effect() sometimes
+      // needs to ask a player something neither `confirmSkill` (yes/no on
+      // whether to USE this trigger) nor `chooseCard` (point at one card)
+      // covers: pick one of a short LABELLED list (刚烈: the damage source
+      // picks "discard two" or "take one damage"; 洛神: keep the black
+      // judgement card and go again, or stop), or pick a PLAYER rather than a
+      // card (突袭: up to two players to take a card from, one at a time).
+      // Both are answered through {t:'resume'}'s ctx exactly like
+      // chooseCard/demandCard are — no bespoke frame type, just a stage + a
+      // move each.
+      //
+      // ⚠️ Same client gap 3.4/3.6 flagged for `chooseCard`'s `{z:'revealed'}`
+      // variant (docs/handoff/3.4-complex-tricks.md): the server-side flow is
+      // complete and correct, but neither has a PromptPanel renderer yet — a
+      // table that reaches 刚烈/洛神/突袭 today will stall on whichever player
+      // is asked. Flagged in docs/handoff/4.3-batchB-skills.md.
+      chooseOption: {
+        moves: {
+          chooseOption: ({ G, ctx, random, events, playerID }, optionId: string) => {
+            if (!G.pending || G.pending.kind !== 'chooseOption' || G.pending.playerId !== playerID) {
+              return INVALID_MOVE;
+            }
+            const options = G.pending.options as { id: string; labelKey: string }[];
+            if (!options.some((o) => o.id === optionId)) return INVALID_MOVE;
+
+            applyToResumeFrame(G, { chosenOption: optionId });
+            G.pending = null;
+            const rng = makeRng(random as BgioRandomLike);
+            pump(G, rng);
+            syncBgio(G, ctx, events);
+            return undefined;
+          },
+        },
+      },
+      choosePlayer: {
+        moves: {
+          choosePlayer: ({ G, ctx, random, events, playerID }, chosen: PlayerId | null) => {
+            if (!G.pending || G.pending.kind !== 'choosePlayer' || G.pending.playerId !== playerID) {
+              return INVALID_MOVE;
+            }
+            const candidates = G.pending.candidates as PlayerId[];
+            if (chosen !== null && !candidates.includes(chosen)) return INVALID_MOVE;
+
+            applyToResumeFrame(G, { chosenPlayer: chosen });
+            G.pending = null;
+            const rng = makeRng(random as BgioRandomLike);
+            pump(G, rng);
+            syncBgio(G, ctx, events);
+            return undefined;
+          },
+        },
+      },
       discard: {
         moves: {
           discard: ({ G, ctx, random, events, playerID }, cardIds: string[]) => {
@@ -672,6 +661,162 @@ export const ThreeKingdomsGame: Game<GState, Record<string, unknown>, ThreeKingd
               cardLostFrame(playerID, cardIds, 'hand'),
               ...endOfPhaseFrames(G, G.turnPhase, playerID),
             ]);
+            const rng = makeRng(random as BgioRandomLike);
+            pump(G, rng);
+            syncBgio(G, ctx, events);
+            return undefined;
+          },
+        },
+      },
+      // 4.4 (Batch C) — five new request kinds. Each follows the established
+      // shape exactly (validate against G.pending, apply, clear pending,
+      // pump, resync) and each is answered directly by its move rather than
+      // through a resume-frame hop, because in every one of these five cases
+      // there is nothing left for a resume frame to decide once the answer
+      // is known.
+      //
+      // 观星 (诸葛亮): the offered card ids ride in the request's own payload —
+      // a private reveal via a PendingRequest, per skill-trigger-design §6 —
+      // and the answer is a full re-ordering of that exact set, re-inserted
+      // on top of the draw pile via the same take-then-put moveCards trick
+      // 3.3/3.4 already use for every other zone.
+      guanxing: {
+        moves: {
+          arrangeCards: ({ G, ctx, random, events, playerID }, order: CardId[]) => {
+            if (!G.pending || G.pending.kind !== 'guanxing' || G.pending.playerId !== playerID) {
+              return INVALID_MOVE;
+            }
+            const offered = G.pending.cards as CardId[];
+            if (!Array.isArray(order) || order.length !== offered.length) return INVALID_MOVE;
+            if (new Set(order).size !== order.length) return INVALID_MOVE;
+            if (!order.every((id) => offered.includes(id))) return INVALID_MOVE;
+
+            G.pending = null;
+            pushFrames(G, [{ t: 'moveCards', cards: order, from: { z: 'drawPile' }, to: { z: 'drawPile' } }]);
+            const rng = makeRng(random as BgioRandomLike);
+            pump(G, rng);
+            syncBgio(G, ctx, events);
+            return undefined;
+          },
+        },
+      },
+      // 鬼才 (司马懿): the owner picks one of their OWN (visible-to-them) hand
+      // cards to replace an in-flight judgement card with — no hidden-card
+      // slot protocol needed, unlike 3.3's chooseCard. `cardId: null`
+      // declines even though the optional trigger already said "yes" —
+      // harmless, same tolerance every demand's decline path has.
+      guicaiRetrial: {
+        moves: {
+          submitRetrial: ({ G, ctx, random, events, playerID }, cardId: CardId | null) => {
+            if (!G.pending || G.pending.kind !== 'guicaiRetrial' || G.pending.playerId !== playerID) {
+              return INVALID_MOVE;
+            }
+            G.pending = null;
+            if (cardId != null) {
+              const hand = G.players[playerID]?.hand ?? [];
+              const idx = hand.indexOf(cardId);
+              if (idx === -1) return INVALID_MOVE;
+              // NOT discardFromHand: the replacement card BECOMES the judgement
+              // card — it lives in G.judgement until judgeResult discards it
+              // (engine/judgement.test.ts pins that flow: hand → G.judgement →
+              // discard, ONE copy). discardFromHand put a second copy straight
+              // into the discard pile, which the 7.2 soak's card-conservation
+              // check caught: after the retrial resolved, the card existed in
+              // both the discard pile and G.judgement, and judgeResult then
+              // discarded it again.
+              hand.splice(idx, 1);
+              pushFrames(G, [cardLostFrame(playerID, [cardId], 'hand'), { t: 'retrial', source: playerID, card: cardId }]);
+            }
+            const rng = makeRng(random as BgioRandomLike);
+            pump(G, rng);
+            syncBgio(G, ctx, events);
+            return undefined;
+          },
+        },
+      },
+      // 遗计 (郭嘉): distribute the two cards {t:'draw'} just gave the owner —
+      // to any living characters, including themselves. `assignments` must
+      // cover exactly the offered set, each card exactly once.
+      yijiDistribute: {
+        moves: {
+          distributeCards: (
+            { G, ctx, random, events, playerID },
+            assignments: { cardId: CardId; target: PlayerId }[],
+          ) => {
+            if (!G.pending || G.pending.kind !== 'yijiDistribute' || G.pending.playerId !== playerID) {
+              return INVALID_MOVE;
+            }
+            const offered = G.pending.cards as CardId[];
+            if (!Array.isArray(assignments) || assignments.length !== offered.length) return INVALID_MOVE;
+            const assignedIds = assignments.map((a) => a.cardId);
+            if (new Set(assignedIds).size !== assignedIds.length) return INVALID_MOVE;
+            if (!assignedIds.every((id) => offered.includes(id))) return INVALID_MOVE;
+            if (!assignments.every((a) => G.players[a.target]?.alive)) return INVALID_MOVE;
+
+            G.pending = null;
+            const frames: Frame[] = [];
+            for (const { cardId, target } of assignments) {
+              if (target === playerID) continue; // already in their own hand
+              frames.push({
+                t: 'moveCards',
+                cards: [cardId],
+                from: { z: 'hand', player: playerID },
+                to: { z: 'hand', player: target },
+                by: playerID,
+              });
+            }
+            pushFrames(G, frames);
+            const rng = makeRng(random as BgioRandomLike);
+            pump(G, rng);
+            syncBgio(G, ctx, events);
+            return undefined;
+          },
+        },
+      },
+      // 流离 (大乔): discard a card to redirect the 杀 that just named the
+      // owner as its target to someone else within the owner's own attack
+      // range. Writes the generic `liuli.redirectTo` turn flag that
+      // content/effects/strike.ts reads at its next resume (see that file's
+      // header for why this can't go through ctx directly).
+      liuliRedirect: {
+        moves: {
+          redirectStrike: (
+            { G, ctx, random, events, playerID },
+            cardId: CardId,
+            newTarget: PlayerId,
+          ) => {
+            if (!G.pending || G.pending.kind !== 'liuliRedirect' || G.pending.playerId !== playerID) {
+              return INVALID_MOVE;
+            }
+            const candidates = G.pending.candidates as PlayerId[];
+            if (!candidates.includes(newTarget)) return INVALID_MOVE;
+            const hand = G.players[playerID]?.hand ?? [];
+            if (!hand.includes(cardId)) return INVALID_MOVE;
+
+            discardFromHand(G, playerID, [cardId]);
+            G.turnFlags['liuli.redirectTo'] = newTarget;
+            G.pending = null;
+            pushFrames(G, [cardLostFrame(playerID, [cardId], 'hand')]);
+            const rng = makeRng(random as BgioRandomLike);
+            pump(G, rng);
+            syncBgio(G, ctx, events);
+            return undefined;
+          },
+        },
+      },
+      // 反间 (周瑜): the TARGET's blind guess, before 周瑜 picks and reveals one
+      // of their hand cards. Feeds fanjian.ts's own resume ctx directly — this
+      // one genuinely is a plain resume-frame answer (fanjian's active effect
+      // is the frame directly on top when this runs; no fan-out sits between).
+      declareSuit: {
+        moves: {
+          declareSuit: ({ G, ctx, random, events, playerID }, suit: string) => {
+            if (!G.pending || G.pending.kind !== 'declareSuit' || G.pending.playerId !== playerID) {
+              return INVALID_MOVE;
+            }
+            if (!['clubs', 'spades', 'diamonds', 'hearts'].includes(suit)) return INVALID_MOVE;
+            applyToResumeFrame(G, { declaredSuit: suit });
+            G.pending = null;
             const rng = makeRng(random as BgioRandomLike);
             pump(G, rng);
             syncBgio(G, ctx, events);

@@ -511,6 +511,61 @@
   margin-top: 0.6rem;
 }
 
+/* The Batch B/C answer surfaces (4.3, 4.4) — 刚烈/洛神's options, 反间's suits,
+   突袭/流离's seats, 观星's ordering, 遗计's distribution. All of them are answered
+   INSIDE the prompt (unlike chooseCard, whose answer is another player's cards
+   and so gets its own panel), because the answer space is small and belongs with
+   the question. */
+.prompt__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.45rem 0 0.1rem;
+}
+
+.btn--option {
+  padding: 0.3rem 0.55rem;
+  font-size: 0.8rem;
+  background: #f1ece1;
+  color: #333;
+  border: 1px solid #d9cfb8;
+}
+
+.btn--option:hover:not(:disabled) {
+  background: #e7e0cf;
+}
+
+/* The picked option, seat or suit. Same colour as a selected card, so "chosen"
+   reads the same everywhere on the board. */
+.btn--picked {
+  background: #2f6feb;
+  border-color: #2f6feb;
+  color: #fff;
+}
+
+.prompt__cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0.2rem;
+}
+
+.prompt__cards--column {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+
+/* 遗计: one row per drawn card — the card, then the seats it can go to. */
+.prompt__assign {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.prompt__assign .prompt__options {
+  margin: 0;
+}
+
 /* The chooseCard answer surface (3.3). It sits ABOVE the prompt panel in the
    side column because it *is* the answer: the hand below is inert during this
    request, and a player who only looks at their own cards will never find the

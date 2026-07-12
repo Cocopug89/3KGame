@@ -118,6 +118,17 @@ export type Frame =
   // just poke G.players[x].hp from inside CardEffect.resolve(); it needs a
   // frame of its own, same shape as 'damage'.
   | { t: 'heal'; target: PlayerId; amount: number; card?: CardId; source?: PlayerId | null }
+  /** Task 4.3's one addition: non-damage HP loss (苦肉 — "失去1点体力", and any
+   * future skill shaped like it). Deliberately NOT routed through the
+   * {t:'damage'} two-step window: skill-trigger-design's damage.after
+   * listeners (奸雄/反馈/刚烈/遗计) must never fire for this — 三国杀 draws a
+   * hard line between 伤害 (damage: has a source and a kind) and 掉血/失去体力
+   * (bare HP loss, no source, no card). Still opens a dying window at 0 hp
+   * exactly like damage step 2 does — what differs is what fires on the way
+   * down, not what happens once you're there. `killer` is always null: there
+   * is no attacker, so death-consequence bounties/penalties (dying.ts) never
+   * fire for a self-inflicted loseHp, which matches the rule. */
+  | { t: 'loseHp'; target: PlayerId; amount: number }
   // ── judgement (3.1 §1) ────────────────────────────────────────────────
   // 'judge' flips the top card into the public G.judgement field and opens
   // the retrial window; 'judgeResult' reads whatever survived that window,
@@ -226,7 +237,15 @@ export type Frame =
    * push this alongside whatever frame they're narrating (e.g. next to the
    * `{t:'damage'}` a 决斗 loss produces) rather than mutating G.log directly,
    * which engine-design §3 forbids. `key`/`params` follow client/src/game/
-   * log.ts's existing vocabulary — reuse a key from there before inventing one. */
+   * log.ts's existing vocabulary — reuse a key from there before inventing one.
+   *
+   * ⚠️ **G.log is PUBLIC — playerView forwards it whole to every client.** It is
+   * the only broadcast channel content can write to, which makes it the easiest
+   * place to leak a secret. THE INVARIANT (task 5.4, docs/anti-cheat-audit.md):
+   * **a log entry may only name a card that is already face up.** If a card moved
+   * hand → hand (反馈, 突袭, 顺手牵羊), log the EVENT, not the card —
+   * `log.card_taken_hidden` exists for exactly this. 反馈/突袭 shipped naming it,
+   * and that was 5.4's one real finding. */
   | { t: 'log'; key: string; params?: Record<string, unknown> }
   // ── phase/turn structure (4.1 §2.2) ───────────────────────────────────
   // A phase is [phase.start trigger, phaseBody]: the body re-reads live state

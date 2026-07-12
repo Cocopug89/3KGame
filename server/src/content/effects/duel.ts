@@ -77,7 +77,13 @@ export const duel: CardEffect = {
       // `current` failed to (or could not) produce a 杀 — the exchange ends
       // right here, one hit, no more rounds.
       return [
-        { t: 'damage', source: other, target: current, amount: 1, kind: 'normal' },
+        // `card` names the ORIGINAL 决斗 card, not whichever 杀 was last
+        // exchanged — task 4.3's 裸衣 needs to tell "this damage came from a
+        // 杀 or 决斗" apart from card-less AoE damage (南蛮入侵/万箭齐发), and
+        // ctx.cards[0] is the one thing that's stable across the whole
+        // exchange. Safe to add: `card` was already optional on {t:'damage'},
+        // and nothing here previously read it back off this frame.
+        { t: 'damage', source: other, target: current, amount: 1, kind: 'normal', card: ctx.cards[0] },
         { t: 'log', key: 'log.damage', params: { target: current, n: 1, source: other } },
       ];
     }

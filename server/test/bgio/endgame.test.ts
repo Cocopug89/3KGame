@@ -159,6 +159,18 @@ describe('a death, over the real framework', () => {
     client.updatePlayerID('0');
     client.moves.playCard(STRIKES[0], ['1']);
 
+    // '1' is sima_yi (generals[1] under the fixed-general-order rig) and '0'
+    // still holds choosable cards/equipment at the moment the damage lands —
+    // exactly the condition under which 反馈 (fankui, task 4.3) legitimately
+    // offers '1' a card from the source before the dying window (and this
+    // kill's own penalty) can proceed. Decline it, the same "no" every other
+    // scripted playthrough gives, so the death this test is actually about
+    // gets to resolve.
+    client.updatePlayerID('1');
+    if (viewAs(client, '1').pending?.kind === 'confirmSkill') {
+      client.moves.respondSkill(false);
+    }
+
     const G = viewAs(client, '0');
     expect(G.players['0'].hand).toEqual([]);
     expect(G.players['0'].equipment.weapon).toBeNull();

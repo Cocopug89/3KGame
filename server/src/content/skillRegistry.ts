@@ -13,6 +13,8 @@
 
 import type { SkillRegistry } from './skillTypes.js';
 import * as batchA from './skills/batchA.js';
+import * as batchB from './skills/batchB.js';
+import * as batchC from './skills/batchC.js';
 
 export const skillRegistry: SkillRegistry = {
   wusheng: batchA.wusheng,
@@ -27,6 +29,36 @@ export const skillRegistry: SkillRegistry = {
   qixi: batchA.qixi,
   biyue: batchA.biyue,
   keji: batchA.keji,
+  // Batch B (4.3) — 12 reactive skills, docs/finish-workflow-plan.md's Lane E.
+  jianxiong: batchB.jianxiong,
+  fankui: batchB.fankui,
+  ganglie: batchB.ganglie,
+  tuxi: batchB.tuxi,
+  luoyi: batchB.luoyi,
+  luoshen: batchB.luoshen,
+  jizhi: batchB.jizhi,
+  zhiheng: batchB.zhiheng,
+  kurou: batchB.kurou,
+  lianying: batchB.lianying,
+  xiaoji: batchB.xiaoji,
+  qingnang: batchB.qingnang,
+  // Batch C (4.4) — 15 complex skills + 国色 pickup, this lane (F).
+  hujia: batchC.hujia,
+  guicai: batchC.guicai,
+  tiandu: batchC.tiandu,
+  yiji: batchC.yiji,
+  rende: batchC.rende,
+  jijiang: batchC.jijiang,
+  guanxing: batchC.guanxing,
+  tieji: batchC.tieji,
+  jiuyuan: batchC.jiuyuan,
+  fanjian: batchC.fanjian,
+  liuli: batchC.liuli,
+  jieyin: batchC.jieyin,
+  jijiu: batchC.jijiu,
+  wushuang: batchC.wushuang,
+  lijian: batchC.lijian,
+  guose: batchC.guose,
 };
 
 /** The registry key an active skill's CardEffect is dispatched under (the

@@ -75,10 +75,150 @@ from a non-Windows shell, which the sandbox gotchas above already warn against. 
 letting `run-tests.bat` reinstall natively fixed it. The on-disk code was correct throughout; nothing in the
 handoff doc's §4 needed re-deriving.)
 
+**3.7 (unit test per trick + per equipment) is DONE.** 20 new files under `server/test/content/`
+(`duel`/`duress`/`barbarianInvasion`/`rainingArrows`/`peachGarden`/`indulgence`/`lightning`/`harvest` for
+3.4, `equip`/`zhugeCrossbow`/`serpentSpear`/`heavenScorcher`/`greenDragonBlade`/`blueSteelSword`/
+`renwangShield`/`unicornBow`/`frostBlade`/`rockCleavingAxe`/`genderSwords`/`eightTrigrams` for 3.5/3.6),
+196 new tests, all green in an isolated scratch build. New files only — no shared file touched, nothing
+for a concurrent lane to collide with. Two small pre-existing gaps documented rather than fixed (out of
+scope for a test-only task): `rainingArrows.ts` logs an undefined card on a deemed-empty (`[]`) 闪 from
+八卦阵 rather than special-casing it the way `duress.ts` does (doesn't crash, just an incomplete log
+line); `eightTrigramsTrigger` never sets an explicit `priority`, unlike every other 3.6 equipment
+trigger. Full record: [`docs/handoff/3.7-unit-tests.md`](docs/handoff/3.7-unit-tests.md).
+
+🤖 **7.2's harness is in (`server/test/playtest/`) — but THE SOAK HAS NOT BEEN RUN. Run
+`npm run soak -w server` on Windows; that is the next command anyone should type.** A seeded bot
+(`bot.ts`) that answers **all 13 request kinds** plays whole games through the real boardgame.io
+reducer, and `soak.test.ts` asserts on **every step** the four things a unit test structurally cannot
+see: **card conservation** · **engine/framework sync** (`ctx.currentPlayer`/`activePlayers` vs
+`G.pending`, every step, not just at turn boundaries) · **no zombie** (never back to `act`/`discard`
+with a living player at 0 hp — a skipped dying window) · **no wedge** (every game ends with a legal
+winner). Two rules keep it honest and should not be "optimised" away: **the bot may only read what
+`playerView` gives a real client** (no engine imports, no peeking at hands), and it **proposes rather
+than pre-filters** — it detects INVALID_MOVE by watching `_stateID`, so it can never quietly disagree
+with the engine about what is legal. `bot.test.ts` (16 tests, green) is the server-side twin of 6.4b's
+client tripwire: **every stage in the shared stage map must be answerable, with a move that stage
+accepts** — a new request kind fails there the day it lands, instead of stalling a real table. Failing
+seeds replay exactly: `SOAK_SEED=<n> SOAK_GAMES=1`. **Log each edge case as a test before fixing it.**
+[`docs/handoff/7.2-playtest-soak.md`](docs/handoff/7.2-playtest-soak.md).
+
+⚠️ **`autosnapshot.bat` has not been running today** — git HEAD is stuck at 23:58 last night, so all of
+Wave 3 (4.5, 5.4, 7.2's harness) has no restore point. Start it.
+
+🔒 **5.4 (anti-cheat audit — Wave 3, Lane I) is DONE → [`docs/anti-cheat-audit.md`](docs/anti-cheat-audit.md).
+One real leak, found and fixed; the move side is sound.** **The leak: `G.log` is forwarded WHOLE to
+every client, and 反馈/突袭 were writing the id of a card they had just lifted out of a hidden HAND
+into it** — every observer could read a card in another player's hand straight out of the log. The
+request never leaked it (3.1 §5's slot protocol did its job); the *public log* did. Fixed in both
+skills by branching on the zone the card came from — `log.card_taken_hidden` (the event, no card id)
+from a hand, `log.card_taken` (with the id) from equipment/judgement zone, which were already face
+up. **THE INVARIANT, now pinned in `frames.ts`'s `{t:'log'}` comment and in three test files: a log
+entry may only name a card that is already FACE UP. If a card moved hand → hand, log the event, not
+the card.** (`content/effects/takeOneCard.ts` — 顺手牵羊/过河拆桥 — logs nothing at all, so it leaks
+nothing, but whoever closes that F3 gap must use the new key for the 顺手牵羊 hand case.)
+**`playerView` now lives in its own file** (`server/src/bgio/playerView.ts`, extracted from
+`bgio/game.ts` — behaviour unchanged, `ThreeKingdomsGame.playerView` still points at it): the
+boundary that decides what leaves the server should be a file you can open, grep and test, and
+`server/test/bgio/playerView.test.ts` (15 tests, each one an *attack* that greps the serialised view
+for a secret) is now the regression suite for it. Everything else passed **with its reasoning
+recorded** rather than assumed: drawPile/stack deleted outright, hands → handCount, roles gated on
+`roleRevealed`, non-`pub.*` flags filtered (F2 holds), **no turnFlag carries a card id** (every 3.x/4.x
+key re-checked), `pending` sent in full only to its own player — which is exactly what 观星's private
+draw-pile peek rides on — and judgement/damage/demand/revealed confirmed *deliberately* public against
+the rules. All 14 moves re-validate against live server state. ⚠️ **The guard rail for whoever adds the
+next skill: `confirmSkill` discloses the raw `TriggerEvent` to the trigger's owner, and a `card.lost`
+event names the ids that left a hand. It is safe TODAY only because all 40 Standard triggers are
+self-scoped — a skill that listens to another player's `card.lost` would leak their hand through it.
+That is the next leak this codebase will have, if it has one.** Shared-file hunks (locales + client
+`LOG_KEYS` + the `game.ts` import) recorded verbatim in
+[`docs/handoff/5.4-anti-cheat-audit.md`](docs/handoff/5.4-anti-cheat-audit.md).
+
+**4.5 (unit test per skill — Wave 3, Lane H) is DONE.** 40 new files under
+`server/test/content/skills/`, one per skill (`<skill>.test.ts` ⇄ `content/skills/<skill>.ts`), 222 new
+tests, all green in an isolated scratch build. New files only — no shared file, no source file, no locale
+key. Each skill's internal continuation effects live in its owner's file (`fankui_take`, `ganglie_result`/
+`_choice`/`_discard`, `tuxi_steal`, `luoshen_result`/`_choice`, `tieji_result`, `yiji_distribute`, and
+`lordProxyEffect` twice — once per kingdom/demand-kind instance, the only thing 护驾 and 激将 differ by).
+**4.4's requested pickup is closed: 反间 now has the direction test whose absence let a real bug through.**
+The assertions that exist to fail loudly on a future "simplification": 克己 reads `strikeUsedInAction`, not
+`strikesPlayed`; 反间 GIVES 周瑜's own card; 苦肉 emits `loseHp` and never `damage`; 裸衣's damage half is
+`optional:false`; 遗计's limit is `once_per_damage`; 观星 mutates nothing and leaks nothing. Two findings
+documented rather than patched (test-only lane, same discipline as 3.7): **`jizhi.ts`'s hard-coded
+non-delayed-trick list omits `nullification`** (无懈可击 is a non-delayed trick by the rule text; whether
+it's reachable depends on the nullify path not emitting `card.play`, which is worth one look), and 离间's
+synthesized 决斗 can't fire 集智 — the same missing `{t:'play'}` frame that correctly makes it
+unnullifiable. **`server/test/content/batchC.test.ts` is now fully subsumed** (every assertion carried over
+verbatim into the per-skill files, plus new ones) and should be deleted by whoever next touches 4.4 — it was
+left in place because deleting another lane's file is not a test-only lane's call. Full record:
+[`docs/handoff/4.5-skill-tests.md`](docs/handoff/4.5-skill-tests.md). ⚠️ The scratch build is not a
+typecheck (vitest transpiles with esbuild) — **`run-tests.bat` on Windows is still the gate**, and the same
+torn-read mount symptom hit ~30 files again, all sandbox-side only.
+
 **4.1b is done** (below), so **4.2 / 4.3 / 4.4 are all unblocked and a skill is now pure content** — no engine
-work stands between them and the registry. **4.3 (Batch B) and 4.4 (Batch C, now including 国色 which needed
-3.4's 乐不思蜀) are next** — see `docs/build-breakdown.md`'s Wave 2 lanes (E/F) in
-[`docs/finish-workflow-plan.md`](docs/finish-workflow-plan.md).
+work stands between them and the registry. **4.3 (Batch B, Lane E) and 4.4 (Batch C, Lane F, now including
+国色 which needed 3.4's 乐不思蜀) are both code-complete** — see `docs/build-breakdown.md`'s Wave 2 lanes
+(E/F) in [`docs/finish-workflow-plan.md`](docs/finish-workflow-plan.md).
+
+**4.3 (Batch B, Lane E) is code-complete (12/12), `run-tests.bat` still pending.** 奸雄/反馈/刚烈/突袭/裸衣/
+洛神/集智/制衡/苦肉/连营/枭姬/青囊, one file each under `content/skills/*.ts` + barrel `batchB.ts`, one
+import line + 12 entries in `skillRegistry.ts`. Three things a later session should not re-derive: (1)
+**`{t:'loseHp'}` is the new primitive 苦肉 needed** (`frames.ts`/`pump.ts`) — HP loss without a card/source
+is explicitly NOT 伤害 (a second source confirms 刚烈-shaped skills must not fire off it), so it skips
+`G.damage`/`damage.after` entirely while still opening the dying window at 0 hp — 3.2's F1 fix (the dead
+turn-player case) is what makes 苦肉 safe to ship at all, and it held. (2) **`putInZone`'s equip-slot
+branch silently discarded a replaced weapon/armour/horse with no `card.lost` emission** — harmless until
+枭姬 became the first listener that needed to hear it; fixed in `pump.ts`, `duel.ts`'s damage frame also
+now carries `card` (needed for 裸衣's 杀/决斗 detection, since AoE damage carries none). (3) **Two new
+request kinds, `chooseOption`/`choosePlayer`** (`bgio/game.ts`, registered in
+`shared/src/threeKingdoms.ts`'s stage-move map or the client would have silently never sent them) — for
+刚烈/洛神's labelled either/or choice and 突袭's up-to-two-players pick. Same **no-`PromptPanel`-case
+client gap** 3.4/3.6/4.4 already flagged for their own new request kinds; whoever closes it should do all
+of `chooseOption`/`choosePlayer`/harvest's `{z:'revealed'}` in one pass. ⚠️ **A skill-id naming bug shipped
+and was caught in the same session**: 刚烈's real id is `ganglie` (skills.json/generals.json/locales), not
+`gangli` — `server/src/content/skills/gangli.ts` was deleted and replaced; if `gangli` (no trailing e)
+ever reappears anywhere under `server/src`/`locales`, that bug regressed. Full record:
+[`docs/handoff/4.3-batchB-skills.md`](docs/handoff/4.3-batchB-skills.md).
+
+**4.4 (Batch C, Lane F) is code-complete (16/16). Opus review done — verdict ship-with-fix; `run-tests.bat`
+is the one step still pending.** The review found and fixed a real bug: **反间 (fanjian) had the
+card-transfer direction inverted** (was taking a card from the target; the locale — the authoritative
+4.1a cross-check — says 周瑜 *gives* the target one of his own cards, revealed, and damages on a suit
+mismatch). Fixed in place; `batchC.test.ts` now pins the direction (fanjian had zero coverage before,
+which is how it slipped through — 4.5 should keep that test). The review also independently verified
+the `strike.ts` turnFlags handoff (below) against the pump/trigger mechanics and confirmed it's
+race-free, and confirmed Batch C does not make the client's missing `orderTriggers` prompt reachable
+(priority bands keep same-event skill/equipment collisions separated). Full findings:
+[`docs/handoff/4.4-batchC-opus-review.md`](docs/handoff/4.4-batchC-opus-review.md). All 16
+skills land as pure content except one restructure a later session should not re-derive:
+**`content/effects/strike.ts` now has a THIRD resolve() step** (`ctx.targeted`, checked before the
+pre-existing `ctx.demanded`, most-advanced-state-first so every ctx built before 4.4 still lands on
+step 3 unchanged) — 铁骑 and 流离 are both `card.target` listeners that need to act *after* their own
+judge/request drains but *before* the dodge demand is built, and the original two-call `strike.ts`
+had already returned the demand+resume frames in the same call that announced the target. Both hand
+their answer back through a generic `G.turnFlags` key (`tieji.forceHit` / `liuli.redirectTo`), read
+and cleared at that new step — **no `pump.ts`/`frames.ts` change was needed.** One catalog correction:
+**急救 is a plain locked-free `cardsAs` query** ("outside your own turn, any red card is a Peach" —
+skill-trigger-design §11's cross-check, not §8's earlier `demand.open` proxy sketch), simpler and
+matches sources. Five new request kinds (`guanxing`/`guicaiRetrial`/`yijiDistribute`/`liuliRedirect`/
+`declareSuit`) have server logic but **no client renderer yet** — same class of gap 3.3/3.4/3.6 left
+for 6.4b-style sessions. ⚠️ **This session's sandbox could not run `tsc`/`vitest`** — the same
+torn-read mount issue 3.4's entry below already traced to the sandbox (confirmed again: syntax
+errors, incl. byte-level NUL padding, in files this lane never touched); every file was hand-verified
+through the Windows-side tools instead. Full record: [`docs/handoff/4.4-batchC-skills.md`](docs/handoff/4.4-batchC-skills.md).
+**`run-tests.bat` was then run on Windows and found 1 build error + 10 test failures
+(`test-output.log`) — all fixed in a follow-up pass, none of them a Batch C correctness bug**: the
+build error was a missing `as unknown as` cast in `lordProxy.ts`; the 5 new stage names were never
+mirrored into `@3k/shared`'s `THREE_KINGDOMS_STAGE_MOVES` drift-guard; `strike.ts`'s step-2 resume
+ctx leaked a stale `targeted: true` field into the demanded ctx (now stripped); and 8 of the 10 test
+failures were pre-existing test fixtures (`moves.test.ts`, `game.test.ts`, `endgame.test.ts`) that
+default/rig their tables to the first N Standard generals and were written before those generals'
+own optional triggers (奸雄 4.1a, 反馈/突袭/鬼才 4.2/4.3) went live — a real strike/damage/death
+sequence can now legitimately stop for a confirmSkill prompt these tests never drove through. Fixed
+per-test (a `test_none` generalId for the fully-generic `moves.test.ts` fixtures; a `confirmSkill`
+case added to `game.test.ts`'s scripted-player `driveOneRequest`; an explicit decline in the one
+affected `endgame.test.ts` case). Full trace: [`docs/handoff/4.4-batchC-skills.md`](docs/handoff/4.4-batchC-skills.md)'s
+"Post-review test-fix pass" section. **This session could not re-run `run-tests.bat` itself to
+confirm green — please re-run it once more.**
 
 **3.5/3.6 (equipment zone + all 11 weapon/armour handlers) are DONE**, run concurrently with 3.4/4.2/deploy. One shared
 `CardEffect` (`content/effects/equip.ts`) handles all 13 equipment `effectKey`s ("equipping IS the effect" —

@@ -40,6 +40,13 @@ export interface Skill {
    * are declared on the trigger itself (SkillTrigger.limit). Engine-enforced —
    * a skill must never re-implement its own limit check (§3.5). */
   activeLimit?: 'unlimited' | 'once_per_turn' | 'once_per_phase';
+  /** 4.4 addition, additive and backward-compatible: some active skills cost
+   * an EXACT number of cards (结姻 discards 2, 离间 discards 1) rather than
+   * "any number" (仁德) or "none" (苦肉, Batch B). `useSkill` (bgio/game.ts)
+   * checks this the same generic way it already checks activeLimit — one more
+   * thing that's true of a whole skill rather than every card, not a
+   * skill-specific `if` hidden in the move. Undefined ⇒ no constraint. */
+  activeCardCount?: number;
 }
 
 export type SkillRegistry = Record<SkillId, Skill>;

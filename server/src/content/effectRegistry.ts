@@ -45,6 +45,22 @@ import { eightTrigramsResult } from './effects/eightTrigrams.js';
 import { frostBladeDiscard } from './effects/frostBlade.js';
 import { rockCleavingAxeHit } from './effects/rockCleavingAxe.js';
 import { genderSwordsGift } from './effects/genderSwords.js';
+// Task 4.3 (Batch B)'s internal resume continuations — dispatched through
+// {t:'resume'}/{t:'effect'} exactly like the ones above, not cards a player
+// ever plays directly. Each lives in its skill's own file (server/src/
+// content/skills/*.ts), not under effects/, since they're skill-only.
+import { fankuiTake } from './skills/fankui.js';
+import { ganglieResult, ganglieChoice, ganglieDiscard } from './skills/ganglie.js';
+import { luoshenResult, luoshenChoice } from './skills/luoshen.js';
+import { tuxiSteal } from './skills/tuxi.js';
+// Task 4.4 (Batch C)'s internal resume continuations — see
+// docs/handoff/4.4-batchC-skills.md.
+import { yijiDistribute } from './effects/yijiDistribute.js';
+import { tiejiResult } from './effects/tiejiResult.js';
+import { lordProxyEffect } from './effects/lordProxy.js';
+
+const hujiaProxy = lordProxyEffect({ key: 'hujia_proxy', kind: 'dodge', kingdom: 'wei' });
+const jijiangProxy = lordProxyEffect({ key: 'jijiang_proxy', kind: 'strike', kingdom: 'shu' });
 
 export const effectRegistry: EffectRegistry = {
   strike,
@@ -92,4 +108,17 @@ export const effectRegistry: EffectRegistry = {
   frost_blade_discard: frostBladeDiscard,
   rock_cleaving_axe_hit: rockCleavingAxeHit,
   gender_swords_gift: genderSwordsGift,
+  // Task 4.3 (Batch B)'s internal continuations.
+  fankui_take: fankuiTake,
+  ganglie_result: ganglieResult,
+  ganglie_choice: ganglieChoice,
+  ganglie_discard: ganglieDiscard,
+  luoshen_result: luoshenResult,
+  luoshen_choice: luoshenChoice,
+  tuxi_steal: tuxiSteal,
+  // Task 4.4 (Batch C)'s internal continuations.
+  yiji_distribute: yijiDistribute,
+  tieji_result: tiejiResult,
+  hujia_proxy: hujiaProxy,
+  jijiang_proxy: jijiangProxy,
 };

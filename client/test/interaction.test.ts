@@ -430,7 +430,25 @@ describe('every request kind the engine can raise has a prompt', () => {
     const kinds = Object.keys(THREE_KINGDOMS_STAGE_MOVES).filter(
       (s) => !STAGES_WITHOUT_A_PENDING.includes(s),
     );
-    expect([...kinds].sort()).toEqual(['act', 'chooseCard', 'confirmSkill', 'demandCard', 'discard']);
+    // Pinned, not derived — the point of this line is that ADDING a stage to the
+    // shared map is a decision that has to be made here too, in the file that
+    // checks the client can answer it. The last seven arrived with Batch B/C
+    // (4.3, 4.4) and had no prompt at all for two phases; this list is how that
+    // stops being possible to miss.
+    expect([...kinds].sort()).toEqual([
+      'act',
+      'chooseCard',
+      'chooseOption',
+      'choosePlayer',
+      'confirmSkill',
+      'declareSuit',
+      'demandCard',
+      'discard',
+      'guanxing',
+      'guicaiRetrial',
+      'liuliRedirect',
+      'yijiDistribute',
+    ]);
 
     for (const kind of kinds) {
       const state: TableState = {
@@ -459,8 +477,26 @@ describe('every request kind the engine can raise has a prompt', () => {
       demandCard: () => actions.supplyCards(),
       confirmSkill: () => actions.respondSkill(false),
       chooseCard: () => actions.chooseCard({ z: 'hand', index: 0 }),
+      // Batch B/C (4.3, 4.4). The move NAMES are the shared map's — boardgame.io
+      // dispatches by name into a stage by name, so a typo here is invisible: it
+      // looks exactly like a server that ignored you.
+      chooseOption: () => actions.chooseOption('discard_two'),
+      choosePlayer: () => actions.choosePlayer('1'),
+      declareSuit: () => actions.declareSuit('hearts'),
+      guanxing: () => actions.arrangeCards(['strike_2c']),
+      guicaiRetrial: () => actions.submitRetrial('strike_2c'),
+      yijiDistribute: () => actions.distributeCards([{ cardId: 'strike_2c', target: '1' }]),
+      liuliRedirect: () => actions.redirectStrike('strike_2c', '2'),
     };
     for (const fire of Object.values(moves)) fire();
-    expect(fired).toHaveLength(5);
+    expect(fired).toHaveLength(12);
+
+    // Every stage in the shared map that can carry a pending has a move above —
+    // the same list the prompt coverage test pins, checked from the other end.
+    const covered = Object.keys(moves).sort();
+    const kinds = Object.keys(THREE_KINGDOMS_STAGE_MOVES)
+      .filter((s) => !STAGES_WITHOUT_A_PENDING.includes(s))
+      .sort();
+    expect(covered).toEqual(kinds);
   });
 });

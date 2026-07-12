@@ -49,6 +49,20 @@ export const THREE_KINGDOMS_STAGE_MOVES = {
   // the order. Cold path: no Standard general reaches it.
   orderTriggers: ['orderTriggers'],
   discard: ['discard'],
+  // Task 4.3 (Batch B): a trigger's effect() asking something neither
+  // confirmSkill nor chooseCard covers — pick one of a short LABELLED list
+  // (刚烈, 洛神), or pick a PLAYER rather than a card (突袭).
+  chooseOption: ['chooseOption'],
+  choosePlayer: ['choosePlayer'],
+  // Task 4.4 (Batch C): each is one skill's own request kind, answered by a
+  // single move that only that stage accepts — 观星 (arrange the top cards),
+  // 郭嘉's retrial redraw, 遗计's two-card distribution, 流离's redirect, and
+  // 反间's suit declaration.
+  guanxing: ['arrangeCards'],
+  guicaiRetrial: ['submitRetrial'],
+  yijiDistribute: ['distributeCards'],
+  liuliRedirect: ['redirectStrike'],
+  declareSuit: ['declareSuit'],
 } as const;
 
 export type ThreeKingdomsStage = keyof typeof THREE_KINGDOMS_STAGE_MOVES;

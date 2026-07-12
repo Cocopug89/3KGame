@@ -31,6 +31,36 @@ export interface TableActions {
    * never a card id — the victim's hand is hidden, and ids leak suit and rank.
    * No decline: the card is already resolving. */
   chooseCard(slot: CardSlot): void;
+
+  // ── Batch B / C (tasks 4.3, 4.4) ────────────────────────────────────────
+  // One move per stage in the shared stage/move map, and the names are THAT
+  // map's (@3k/shared's THREE_KINGDOMS_STAGE_MOVES) — boardgame.io dispatches a
+  // move by name into a stage by name, so a typo here looks exactly like a
+  // server that ignored you.
+
+  /** 刚烈 (discard two / take the damage) · 洛神 (judge again / stop) — one of the
+   * labelled options the ENGINE offered. No decline: the option list is the
+   * answer space, and one of them must be chosen. */
+  chooseOption(optionId: string): void;
+  /** 突袭 — a seat, not a card. `null` declines, which is a real answer here:
+   * 突袭 takes from *up to* two players, so stopping early is the skill working,
+   * not the player refusing. */
+  choosePlayer(playerId: string | null): void;
+  /** 反间 — the target names a suit before 周瑜 reveals the card. Blind by
+   * design: the whole skill is the guess. */
+  declareSuit(suit: string): void;
+  /** 观星 — the offered cards, re-ordered, all of them. Index 0 ends up on top of
+   * the draw pile. */
+  arrangeCards(order: string[]): void;
+  /** 鬼才 — one of your OWN hand cards, to replace the judgement card with.
+   * `null` declines (the optional trigger already said yes; changing your mind
+   * here is free — see bgio/game.ts's submitRetrial). */
+  submitRetrial(cardId: string | null): void;
+  /** 遗计 — every drawn card assigned to a living seat, including your own. */
+  distributeCards(assignments: { cardId: string; target: string }[]): void;
+  /** 流离 — discard one of your cards to move the 杀 onto `newTarget`. Both
+   * arguments are required: the discard is the COST, not a formality. */
+  redirectStrike(cardId: string, newTarget: string): void;
 }
 
 /** What the board fired, for the harness to display and for tests to assert on. */
@@ -47,5 +77,13 @@ export function recordingActions(sink: (intent: RecordedIntent) => void): TableA
     respondSkill: (use) => sink({ move: 'respondSkill', args: [use] }),
     discard: (cardIds) => sink({ move: 'discard', args: [cardIds] }),
     chooseCard: (slot) => sink({ move: 'chooseCard', args: [slot] }),
+    chooseOption: (optionId) => sink({ move: 'chooseOption', args: [optionId] }),
+    choosePlayer: (playerId) => sink({ move: 'choosePlayer', args: [playerId] }),
+    declareSuit: (suit) => sink({ move: 'declareSuit', args: [suit] }),
+    arrangeCards: (order) => sink({ move: 'arrangeCards', args: [order] }),
+    submitRetrial: (cardId) => sink({ move: 'submitRetrial', args: [cardId] }),
+    distributeCards: (assignments) => sink({ move: 'distributeCards', args: [assignments] }),
+    redirectStrike: (cardId, newTarget) =>
+      sink({ move: 'redirectStrike', args: [cardId, newTarget] }),
   };
 }

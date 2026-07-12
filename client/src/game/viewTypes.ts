@@ -65,10 +65,49 @@ export function isSelfView(p: AnyPlayerView): p is SelfPlayerView {
  * (skill-trigger-design §5): 杀→闪, 濒死→桃, 决斗→杀 and trick→无懈可击 all arrive
  * as one kind, and `respondDodge`/`respondPeach` were deleted.
  *
- * 'orderTriggers' (§3.1 step 3) is deliberately absent: no Standard general can
- * reach it, and promptFor() returning null for it is honest — a board that
+ * The last seven landed with Batch B/C (tasks 4.3/4.4) and had no prompt at all
+ * until now — the engine could block on them and the board would offer nothing,
+ * which is a stalled table (see prompts.ts's header). They are here because
+ * interaction.test.ts drives every stage in the shared stage/move map through
+ * promptFor() and fails on any that produces nothing.
+ *
+ * 'orderTriggers' (§3.1 step 3) is STILL deliberately absent: no Standard general
+ * can reach it, and promptFor() returning null for it is honest — a board that
  * silently invents an order would be worse than one that shows nothing. */
-export type PromptKind = 'act' | 'discard' | 'demandCard' | 'confirmSkill' | 'chooseCard';
+export type PromptKind =
+  | 'act'
+  | 'discard'
+  | 'demandCard'
+  | 'confirmSkill'
+  | 'chooseCard'
+  /** 刚烈 · 洛神 — pick one of a short labelled list. */
+  | 'chooseOption'
+  /** 突袭 — pick a player rather than a card. */
+  | 'choosePlayer'
+  /** 反间 — name a suit, blind. */
+  | 'declareSuit'
+  /** 观星 — re-order the top of the draw pile. */
+  | 'guanxing'
+  /** 鬼才 — replace an in-flight judgement card with one of your own. */
+  | 'guicaiRetrial'
+  /** 遗计 — hand the two drawn cards out, one seat at a time. */
+  | 'yijiDistribute'
+  /** 流离 — discard a card to push a 杀 onto someone else. */
+  | 'liuliRedirect';
+
+/** One entry in a `chooseOption` request. The engine mints both the id and the
+ * i18n key (server/src/content/skills/ganglie.ts, luoshen.ts) and ships them on
+ * the request — the client renders what it is given and never invents an option,
+ * exactly as it never invents a `chooseCard` slot. */
+export interface PromptOption {
+  id: string;
+  labelKey: string;
+}
+
+/** The four suits, in the order 反间's picker offers them. The engine validates
+ * the answer against this same list (bgio/game.ts's declareSuit move). */
+export const SUITS = ['spades', 'hearts', 'clubs', 'diamonds'] as const;
+export type Suit = (typeof SUITS)[number];
 
 /**
  * One thing you may point at in a `chooseCard` request — the client mirror of

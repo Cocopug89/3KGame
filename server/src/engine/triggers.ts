@@ -127,9 +127,13 @@ export function ambiguousOrderGroup(
   G: GState,
   ev: TriggerEvent,
   order?: TriggerOrder,
+  // Precomputed snapshot from the same G/ev/order — pump.ts's 'trigger' case
+  // shares one collectListeners() run between this check and fanOut() instead
+  // of collecting-and-sorting twice per event. Same values by construction.
+  listeners: readonly Listener[] = collectListeners(G, ev, order),
 ): { owner: PlayerId; triggerIds: string[] } | null {
   const groups = new Map<string, Listener[]>();
-  for (const listener of collectListeners(G, ev, order)) {
+  for (const listener of listeners) {
     const key = `${listener.owner}|${listener.priority}`;
     const group = groups.get(key);
     if (group) group.push(listener);
@@ -150,8 +154,13 @@ export function ambiguousOrderGroup(
 /** The frames a `{t:'trigger'}` fan-out expands into: one `triggerStep` per
  * listener, in narrative order (pushFrames reverses them, so listeners[0] pops
  * first). */
-export function fanOut(G: GState, ev: TriggerEvent, order?: TriggerOrder): Frame[] {
-  return collectListeners(G, ev, order).map((l) => ({
+export function fanOut(
+  G: GState,
+  ev: TriggerEvent,
+  order?: TriggerOrder,
+  listeners: readonly Listener[] = collectListeners(G, ev, order),
+): Frame[] {
+  return listeners.map((l) => ({
     t: 'triggerStep' as const,
     ev,
     owner: l.owner,

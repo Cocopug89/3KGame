@@ -231,23 +231,46 @@ function expectInvariants(client: BgClient): void {
   // boundaries.
   expect(ctx.currentPlayer).toBe(G.seats[G.activeSeat]);
   expect(ctx.activePlayers).toEqual({ [G.pending!.playerId!]: G.pending!.kind });
-  // The engine never asks a dead player for anything, and never leaves a
-  // living player at hp <= 0 outside an open dying window.
+  // The engine never asks a dead player for anything, and never hands control
+  // back to the TURN LOOP with a living player still at hp <= 0.
   expect(G.players[G.pending!.playerId!].alive).toBe(true);
   for (const p of Object.values(G.players)) {
     expect(p.hp).toBeLessThanOrEqual(p.maxHp);
-    if (p.alive && !isDyingWindow(G)) {
-      expect(p.hp).toBeGreaterThan(0);
+    if (p.alive && p.hp <= 0) {
+      // Asserted against the request KIND rather than a bare boolean so that a
+      // regression names the request the engine wrongly handed back while a
+      // zombie was still on the table, instead of saying "expected false to be
+      // true".
+      expect(TURN_LOOP_REQUESTS).not.toContain(G.pending!.kind);
     }
   }
 }
 
-/** A 桃 demand IS the dying window (4.1b: respondPeach was retired into the
- * generic demand protocol), and it is the one moment a living player may sit at
- * 0 hp. */
-function isDyingWindow(G: ViewState): boolean {
-  return G.pending!.kind === 'demandCard' && G.pending!.demandKind === 'peach';
-}
+/**
+ * The two requests that mean *the engine has finished resolving and is asking
+ * the turn player what they want to do next*. Everything else G.pending can name
+ * — a 闪/桃 demand, an optional trigger's yes/no, 刚烈's discard-or-take-damage —
+ * is an INTERRUPT raised from inside a resolution that has not finished yet.
+ *
+ * This is the honest statement of the rule task 2.8 was reaching for. Back then
+ * the 桃 demand *was* the only moment a living player could sit at 0 hp, so this
+ * check was written as "pending must be the 桃 demand" — and Phase 4 falsified
+ * it. docs/skill-trigger-design.md §2's emission table puts `damage.after`
+ * "after `hp` is decremented, **before** the dying check", precisely so that
+ * 奸雄/反馈/刚烈/遗计 resolve while their owner is at 0 hp and not yet dead
+ * (pump.ts's 'damage' step 2 says the same). All four are optional, so each one
+ * BLOCKS on a `confirmSkill` prompt right there — a living player at 0 hp with
+ * no 桃 demand in sight, which is correct, and which the old predicate called a
+ * bug.
+ *
+ * What must still never happen is the thing that check was really guarding: the
+ * engine draining its stack back to `act`/`discard` while someone is stranded
+ * alive at 0 hp — the dying window silently skipped, a zombie left on the table.
+ * Both `act` and `discard` sit at the BOTTOM of the frames their move pushes, so
+ * every damage/dying frame above them has drained by the time either pops; if
+ * one ever pops with a 0-hp survivor, the dying window was lost.
+ */
+const TURN_LOOP_REQUESTS = ['act', 'discard'];
 
 // ── task 2.8: the scripted player ─────────────────────────────────────────
 
@@ -310,6 +333,15 @@ function driveOneRequest(client: BgClient): string {
       client.moves.supplyCards([card]);
       return kind === 'peach' ? 'save' : 'dodge';
     }
+    // 4.2/4.4: real generals now carry real optional triggers (奸雄, 突袭,
+    // 鬼才…) that can legitimately fire in the middle of these scripted
+    // playthroughs — a Standard general's own book-keeping, not a script
+    // action. This scripted player always declines, the same "no" a
+    // disengaged human would give by default; the point of these tests is
+    // the turn/stage machinery, not any one skill's resolution.
+    case 'confirmSkill':
+      client.moves.respondSkill(false);
+      return 'decline';
     default:
       throw new Error(`driveOneRequest: don't know how to drive request kind '${pending.kind}'`);
   }
@@ -319,6 +351,18 @@ describe('ThreeKingdomsGame (bgio adapter)', () => {
   it('deals a legal opening state with the active player waiting in the act stage', () => {
     const client = Client({ game: ThreeKingdomsGame, numPlayers: 4 }) as unknown as BgClient;
     client.start();
+
+    // Untouched general/role deal (task 2.3 predates any general having a
+    // real skill) — the deal is real, so whoever lands the Lord seat is
+    // whoever the role RNG picked, and if that happens to be a general with
+    // an optional phase.start replacement (突袭), the very first thing G.pending
+    // names is that decision, not 'act'. That is a legitimate opening state,
+    // not a wiring bug, so decline it the same way any other scripted
+    // playthrough does before checking the invariant this test actually
+    // cares about: the deal is legal AND it reaches the striker's act stage.
+    while (readAsPendingPlayer(client).G.pending?.kind === 'confirmSkill') {
+      driveOneRequest(client);
+    }
 
     const { G, ctx } = readAsPendingPlayer(client);
     expect(Object.keys(G.players)).toHaveLength(4);

@@ -41,8 +41,15 @@
 //     correct failure mode, and why nothing here is load-bearing.
 
 import { cardById } from './cardIndex.js';
-import type { CardSlot, PromptKind, SelfPlayerView, TableState } from './viewTypes.js';
-import { isSelfPending, isSelfView } from './viewTypes.js';
+import type {
+  CardSlot,
+  PromptKind,
+  PromptOption,
+  SelfPlayerView,
+  Suit,
+  TableState,
+} from './viewTypes.js';
+import { SUITS, isSelfPending, isSelfView } from './viewTypes.js';
 
 /** Effects the server can actually resolve today (server/src/content/effectRegistry.ts).
  * Anything else is in the deck but not yet implemented — Phase 3 adds tricks and
@@ -128,11 +135,28 @@ export interface PromptView {
   choices?: readonly CardSlot[];
   /** chooseCard only: whose cards you are pointing at. */
   choiceTarget?: string;
-  /** chooseCard only: the engine's own explanation ('choose.dismantle'), which
-   * takes {{player}}. Demands carry theirs on `G.pending` instead (see
-   * demandReasonKey) — this one rides on the prompt because it is also the
-   * title. */
+  /** chooseCard and the Batch B/C kinds: the engine's own explanation
+   * ('choose.dismantle', 'choose.ganglie'), which may take {{player}}. Demands
+   * carry theirs on `G.pending` instead (see demandReasonKey) — this one rides on
+   * the prompt because it is also the TITLE, when it resolves. Guarded with
+   * i18n.exists() at the render site: an engine reasonKey can land before its
+   * string does, and a raw key is not a question. */
   reasonKey?: string;
+  /** chooseOption only (刚烈 · 洛神): the labelled list the engine offered. */
+  options?: readonly PromptOption[];
+  /** choosePlayer (突袭) and liuliRedirect (流离): the seats the ENGINE says are
+   * legal. Note this is the OPPOSITE of how 'act' picks targets — there the
+   * client offers every living seat and lets the server refuse, because range is
+   * engine/distance.ts's business and a second copy would drift (see the header).
+   * Here the engine has ALREADY done that filtering and shipped the result, so
+   * the picker offers exactly these and invents nothing. */
+  candidates?: readonly string[];
+  /** guanxing (观星) and yijiDistribute (遗计): cards the engine is showing YOU and
+   * nobody else — a private reveal on the request itself (skill-trigger-design
+   * §6), which is why they arrive as ids rather than as a count. */
+  cards?: readonly string[];
+  /** declareSuit only (反间). */
+  suits?: readonly Suit[];
 }
 
 /**
@@ -224,6 +248,156 @@ export function promptFor(state: TableState, viewerId: string | null): PromptVie
         secondaryKey: null,
       };
     }
+
+    // ── Batch B / C (tasks 4.3, 4.4) ──────────────────────────────────────
+    //
+    // Seven request kinds the engine has been able to raise since Phase 4 and
+    // this file had no case for — so promptFor() returned null, the player was
+    // offered nothing, and the table stalled on whoever was asked. That is the
+    // third time the same gap has opened (3.2's demandCard, 3.3's chooseCard),
+    // and it is why the tripwire in interaction.test.ts now drives EVERY stage in
+    // the shared stage/move map through this function.
+    //
+    // Each reads only what its own request carries and invents nothing: the
+    // options, the candidate seats and the revealed cards are all the engine's,
+    // shipped on `G.pending`. Missing/!Array payloads fall back to empty rather
+    // than throwing — a prompt with nothing in it is a visible dead end the
+    // player can report, and a crashed board is not.
+
+    // 刚烈 (the damage source picks: discard two, or take 1 damage) · 洛神 (keep
+    // the black judgement card and judge again, or stop). The engine ships both
+    // the option ids and their i18n keys.
+    case 'chooseOption': {
+      const options = Array.isArray(pending.options) ? (pending.options as PromptOption[]) : [];
+      return {
+        kind: 'chooseOption',
+        titleKey: 'prompt.choose_option',
+        allowedEffectKeys: [], // answered by picking an option, not a card
+        cardCount: 0,
+        needsTargets: false,
+        primaryKey: 'ui.confirm',
+        secondary: null, // one of the options IS the answer space; there is no third door
+        secondaryKey: null,
+        options,
+        ...(typeof pending.reasonKey === 'string' ? { reasonKey: pending.reasonKey } : {}),
+      };
+    }
+
+    // 突袭 — a seat, not a card. Declining is a REAL answer, not a refusal: 突袭
+    // takes a card from *up to* two players, so "stop" is the skill working as
+    // written (server/src/content/skills/tuxi.ts, and bgio/game.ts's choosePlayer
+    // explicitly accepts null).
+    case 'choosePlayer': {
+      const candidates = Array.isArray(pending.candidates) ? (pending.candidates as string[]) : [];
+      return {
+        kind: 'choosePlayer',
+        titleKey: 'prompt.choose_player',
+        allowedEffectKeys: [],
+        cardCount: 0,
+        needsTargets: false,
+        primaryKey: 'ui.confirm',
+        secondary: 'decline',
+        secondaryKey: 'prompt.choose_player_stop',
+        candidates,
+        ...(typeof pending.reasonKey === 'string' ? { reasonKey: pending.reasonKey } : {}),
+      };
+    }
+
+    // 反间 — the TARGET names a suit before 周瑜 reveals one of his hand cards.
+    // The guess is blind, and that IS the skill: no hint is offered here, and the
+    // client has nothing to base one on anyway (周瑜's hand is not in this view).
+    case 'declareSuit':
+      return {
+        kind: 'declareSuit',
+        titleKey: 'prompt.declare_suit',
+        allowedEffectKeys: [],
+        cardCount: 0,
+        needsTargets: false,
+        primaryKey: 'ui.confirm',
+        secondary: null,
+        secondaryKey: null,
+        suits: SUITS,
+        ...(typeof pending.reasonKey === 'string' ? { reasonKey: pending.reasonKey } : {}),
+      };
+
+    // 观星 — the top N cards of the draw pile, private to 诸葛亮 (§6). The answer
+    // is the whole set, re-ordered; index 0 goes back on top. The server's move
+    // re-inserts the full permutation and nothing else, so the client offers
+    // ordering and nothing else — notably NOT the "bottom of the pile" half of
+    // the printed skill, which the engine does not implement and the client must
+    // therefore not pretend to.
+    case 'guanxing': {
+      const cards = Array.isArray(pending.cards) ? (pending.cards as string[]) : [];
+      return {
+        kind: 'guanxing',
+        titleKey: 'prompt.guanxing',
+        allowedEffectKeys: [],
+        cardCount: 0,
+        needsTargets: false,
+        primaryKey: 'ui.confirm',
+        secondary: null,
+        secondaryKey: null,
+        cards,
+      };
+    }
+
+    // 鬼才 — replace an in-flight judgement card with one of your OWN hand cards.
+    // Any card: the rule is about the card's suit/rank once it lands, never about
+    // what it *is*, so this is a cost like a discard and the hand is fully
+    // selectable (see cardBlock's CARD_IS_A_COST). Declining is free even though
+    // the optional trigger already said yes (bgio/game.ts's submitRetrial takes
+    // null).
+    case 'guicaiRetrial':
+      return {
+        kind: 'guicaiRetrial',
+        titleKey: 'prompt.guicai',
+        allowedEffectKeys: null, // any hand card
+        cardCount: 1,
+        needsTargets: false,
+        primaryKey: 'ui.confirm',
+        secondary: 'decline',
+        secondaryKey: 'prompt.decline_retrial',
+      };
+
+    // 遗计 — the two cards 郭嘉 just drew, handed out one seat at a time. They are
+    // already IN his hand (the engine drew them first), so this is not a hand
+    // selection: it is an assignment of each named card to a living seat, and
+    // every one of them must be placed — including, legally, back to himself.
+    case 'yijiDistribute': {
+      const cards = Array.isArray(pending.cards) ? (pending.cards as string[]) : [];
+      return {
+        kind: 'yijiDistribute',
+        titleKey: 'prompt.yiji',
+        allowedEffectKeys: [],
+        cardCount: 0,
+        needsTargets: false,
+        primaryKey: 'ui.confirm',
+        secondary: null,
+        secondaryKey: null,
+        cards,
+      };
+    }
+
+    // 流离 — discard a card to push the 杀 onto someone else in YOUR attack range.
+    // Two answers in one: the card (a cost — any card) and the seat. The seats are
+    // the engine's own list (it range-checked them, and excluded the 杀's user);
+    // the client does not re-derive range. No decline: the optional trigger's
+    // confirmSkill was the decline, and the move takes both arguments.
+    case 'liuliRedirect': {
+      const candidates = Array.isArray(pending.candidates) ? (pending.candidates as string[]) : [];
+      return {
+        kind: 'liuliRedirect',
+        titleKey: 'prompt.liuli',
+        allowedEffectKeys: null, // any hand card — the discard is a cost
+        cardCount: 1,
+        needsTargets: false, // the seat comes from `candidates`, not from targetHint()
+        primaryKey: 'ui.confirm',
+        secondary: null,
+        secondaryKey: null,
+        candidates,
+      };
+    }
+
     default:
       return null;
   }
@@ -255,6 +429,10 @@ export function demandReasonKey(state: TableState): string | null {
   return typeof pending.reasonKey === 'string' ? pending.reasonKey : null;
 }
 
+/** Prompts whose hand card is a COST rather than a play: it leaves your hand to
+ * pay for something, and nothing about the card itself has to be legal. */
+const CARD_IS_A_COST: readonly PromptKind[] = ['discard', 'guicaiRetrial', 'liuliRedirect'];
+
 /** Can this hand card be selected for this prompt? Returns the reason it can't,
  * so the UI can explain itself rather than just greying out silently. */
 export type CardBlock =
@@ -282,9 +460,12 @@ export function cardBlock(
   if (prompt.allowedEffectKeys && !prompt.allowedEffectKeys.includes(card.effectKey)) {
     return 'wrong_card';
   }
-  // Discarding is a card-agnostic cost — an unimplemented trick still discards
-  // perfectly well, so the implementation gate only applies to *playing*.
-  if (prompt.kind === 'discard') return null;
+  // A card spent as a COST is never *played*, so what it would have done is
+  // irrelevant: an unimplemented trick discards perfectly well, replaces a
+  // judgement card perfectly well (鬼才 cares about the card's suit and rank once
+  // it lands, never about what it is), and pays for 流离 perfectly well. The
+  // implementation gate only applies to actually PLAYING a card.
+  if (CARD_IS_A_COST.includes(prompt.kind)) return null;
   if (!IMPLEMENTED_EFFECT_KEYS.includes(card.effectKey)) return 'not_implemented';
 
   if (prompt.kind === 'act') {

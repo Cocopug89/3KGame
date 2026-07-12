@@ -2,9 +2,14 @@ import { useMemo, useState } from 'react';
 import type { TableActions } from '../../game/actions';
 import {
   EMPTY_SELECTION,
+  assignCard,
   chooseSlot,
+  pickOption,
+  pickPlayer,
+  pickSuit,
   selectionKey,
   toggleCard,
+  toggleOrder,
   toggleTarget,
 } from '../../game/interaction';
 import type { Selection } from '../../game/interaction';
@@ -92,6 +97,15 @@ export function GameTable({ state, viewerId, actions, rejected = false }: GameTa
 
   const onChooseSlot = (slot: CardSlot) => setSelection((cur) => chooseSlot(cur, slot));
 
+  // Batch B/C pickers (4.3, 4.4). Each owns one field of the selection, so 流离
+  // can hold a card and a seat at once without either clobbering the other.
+  const onPickOption = (optionId: string) => setSelection((cur) => pickOption(cur, optionId));
+  const onPickPlayer = (playerId: string) => setSelection((cur) => pickPlayer(cur, playerId));
+  const onPickSuit = (suit: string) => setSelection((cur) => pickSuit(cur, suit));
+  const onToggleOrder = (cardId: string) => setSelection((cur) => toggleOrder(cur, cardId));
+  const onAssign = (cardId: string, target: string) =>
+    setSelection((cur) => assignCard(cur, cardId, target));
+
   const submit = () => {
     if (!actions || !prompt) return;
     const [card] = selection.cards;
@@ -114,6 +128,32 @@ export function GameTable({ state, viewerId, actions, rejected = false }: GameTa
       case 'chooseCard':
         if (selection.slot) actions.chooseCard(selection.slot);
         break;
+
+      // ── Batch B / C (4.3, 4.4) ────────────────────────────────────────
+      // Guarded on the same fields canSubmit() gates the button on, so these
+      // can't fire half an answer even if something else enables the button.
+      case 'chooseOption':
+        if (selection.option) actions.chooseOption(selection.option);
+        break;
+      case 'choosePlayer':
+        if (selection.player) actions.choosePlayer(selection.player);
+        break;
+      case 'declareSuit':
+        if (selection.suit) actions.declareSuit(selection.suit);
+        break;
+      case 'guanxing':
+        if (selection.order) actions.arrangeCards(selection.order);
+        break;
+      case 'guicaiRetrial':
+        if (card) actions.submitRetrial(card);
+        break;
+      case 'yijiDistribute':
+        if (selection.assignments) actions.distributeCards(selection.assignments);
+        break;
+      // Two-part answer: the card is the cost, the seat is the effect.
+      case 'liuliRedirect':
+        if (card && selection.player) actions.redirectStrike(card, selection.player);
+        break;
     }
     setSelection(EMPTY_SELECTION);
   };
@@ -125,6 +165,11 @@ export function GameTable({ state, viewerId, actions, rejected = false }: GameTa
     // move with no argument (see bgio/game.ts's supplyCards).
     if (prompt.secondary === 'decline' && prompt.kind === 'demandCard') actions.supplyCards();
     if (prompt.secondary === 'decline' && prompt.kind === 'confirmSkill') actions.respondSkill(false);
+    // 突袭 stops early (a real answer — it takes from *up to* two players), and
+    // 鬼才 walks away from a retrial it already said yes to. Both are `null`, and
+    // both are moves: the engine is blocked until one arrives.
+    if (prompt.secondary === 'decline' && prompt.kind === 'choosePlayer') actions.choosePlayer(null);
+    if (prompt.secondary === 'decline' && prompt.kind === 'guicaiRetrial') actions.submitRetrial(null);
     setSelection(EMPTY_SELECTION);
   };
 
@@ -192,6 +237,11 @@ export function GameTable({ state, viewerId, actions, rejected = false }: GameTa
               onSubmit={submit}
               onSecondary={secondary}
               rejected={rejected}
+              onPickOption={onPickOption}
+              onPickPlayer={onPickPlayer}
+              onPickSuit={onPickSuit}
+              onToggleOrder={onToggleOrder}
+              onAssign={onAssign}
             />
           ) : null}
           <GameLog state={state} />

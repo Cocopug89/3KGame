@@ -14,9 +14,38 @@ export interface Selection {
    * pointing at. Optional, so the two answer shapes stay disjoint — a prompt is
    * answered with cards (+targets), or with a slot, never both. */
   slot?: CardSlot | null;
+
+  // ── Batch B / C answers (tasks 4.3, 4.4) ────────────────────────────────
+  // All optional: a prompt uses exactly the one field its answer has, and the
+  // rest stay untouched. 流离 is the only kind that fills TWO (a card AND a
+  // seat) — which is why toggleCard/pickPlayer below preserve the fields they
+  // don't own instead of rebuilding the selection from scratch.
+
+  /** chooseOption (刚烈 · 洛神). */
+  option?: string | null;
+  /** choosePlayer (突袭) and liuliRedirect (流离). Distinct from `targets`, which
+   * is an 'act' play's target list and is cleared whenever the card changes. */
+  player?: string | null;
+  /** declareSuit (反间). */
+  suit?: string | null;
+  /** guanxing (观星): the offered cards in the order the player wants them back on
+   * the pile, index 0 = top. Built by clicking, so a partial order is a normal
+   * mid-answer state and canSubmit() waits for all of them. */
+  order?: string[];
+  /** yijiDistribute (遗计): where each drawn card is going. */
+  assignments?: { cardId: string; target: string }[];
 }
 
-export const EMPTY_SELECTION: Selection = { cards: [], targets: [], slot: null };
+export const EMPTY_SELECTION: Selection = {
+  cards: [],
+  targets: [],
+  slot: null,
+  option: null,
+  player: null,
+  suit: null,
+  order: [],
+  assignments: [],
+};
 
 /**
  * Toggling a card off is as important as toggling it on — a misclick during a
@@ -32,16 +61,63 @@ export const EMPTY_SELECTION: Selection = { cards: [], targets: [], slot: null }
 export function toggleCard(selection: Selection, prompt: PromptView, cardId: string): Selection {
   const already = selection.cards.includes(cardId);
   if (already) {
-    return { cards: selection.cards.filter((c) => c !== cardId), targets: [] };
+    return { ...selection, cards: selection.cards.filter((c) => c !== cardId), targets: [] };
   }
   if (prompt.cardCount === 1) {
-    return { cards: [cardId], targets: [] };
+    return { ...selection, cards: [cardId], targets: [] };
   }
   // Discard: fill up to the required count, then ignore further picks — the
   // engine wants exactly `count`, and silently dropping the oldest selection
   // would make the discard the player confirms not the one they think they see.
   if (selection.cards.length >= prompt.cardCount) return selection;
-  return { cards: [...selection.cards, cardId], targets: [] };
+  return { ...selection, cards: [...selection.cards, cardId], targets: [] };
+}
+
+// ── Batch B / C pickers (tasks 4.3, 4.4) ─────────────────────────────────
+// Same toggle-off rule as a card, for the same reason: a misclick must be
+// undoable without submitting. Each preserves the fields it does not own — 流离
+// needs a card AND a seat held at the same time.
+
+/** 刚烈 · 洛神. */
+export function pickOption(selection: Selection, optionId: string): Selection {
+  return { ...selection, option: selection.option === optionId ? null : optionId };
+}
+
+/** 突袭 · 流离. */
+export function pickPlayer(selection: Selection, playerId: string): Selection {
+  return { ...selection, player: selection.player === playerId ? null : playerId };
+}
+
+/** 反间. */
+export function pickSuit(selection: Selection, suit: string): Selection {
+  return { ...selection, suit: selection.suit === suit ? null : suit };
+}
+
+/**
+ * 观星 — click a card to append it to the order, click it again to pull it back
+ * out. Position in `order` IS the answer (index 0 goes on top of the draw pile),
+ * so this is a queue the player builds, not a set they tick: re-clicking removes
+ * that card and everything keeps its relative order behind it.
+ */
+export function toggleOrder(selection: Selection, cardId: string): Selection {
+  const order = selection.order ?? [];
+  return {
+    ...selection,
+    order: order.includes(cardId) ? order.filter((id) => id !== cardId) : [...order, cardId],
+  };
+}
+
+/**
+ * 遗计 — send one drawn card to one seat. Re-assigning a card MOVES it (a card
+ * has exactly one destination, and the engine rejects a set that names one twice)
+ * and clicking its current seat again un-assigns it.
+ */
+export function assignCard(selection: Selection, cardId: string, target: string): Selection {
+  const assignments = selection.assignments ?? [];
+  const current = assignments.find((a) => a.cardId === cardId);
+  const without = assignments.filter((a) => a.cardId !== cardId);
+  if (current?.target === target) return { ...selection, assignments: without };
+  return { ...selection, assignments: [...without, { cardId, target }] };
 }
 
 /** Point at one of the target's cards, or take your finger off it. Same
@@ -86,6 +162,31 @@ export function canSubmit(
   // seats — and it has no decline path, so this is the only thing that ever
   // unblocks the engine.
   if (prompt.kind === 'chooseCard') return selection.slot != null;
+
+  // ── Batch B / C (4.3, 4.4). Each answers with its own shape, and each is
+  // complete or it is not — there is no partial answer to submit.
+  switch (prompt.kind) {
+    case 'chooseOption':
+      return selection.option != null;
+    case 'choosePlayer':
+      return selection.player != null;
+    case 'declareSuit':
+      return selection.suit != null;
+    // 观星: the engine wants the WHOLE set back, permuted — a partial order would
+    // silently drop cards off the top of the draw pile, so every offered card has
+    // to be placed before this enables.
+    case 'guanxing':
+      return (selection.order?.length ?? 0) === (prompt.cards?.length ?? 0);
+    // 遗计: same — every drawn card gets a home, including back to yourself.
+    case 'yijiDistribute':
+      return (selection.assignments?.length ?? 0) === (prompt.cards?.length ?? 0);
+    // 流离 is the one prompt with a two-part answer: the card is the cost, the
+    // seat is the effect, and neither alone is a move.
+    case 'liuliRedirect':
+      return selection.cards.length === 1 && selection.player != null;
+    default:
+      break;
+  }
 
   if (selection.cards.length !== prompt.cardCount) return false;
   if (!prompt.needsTargets) return true;
