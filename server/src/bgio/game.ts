@@ -13,7 +13,13 @@ import type { Game } from 'boardgame.io';
 // `boardgame.io/core` (no "exports" map on this package; same issue as the
 // server's own `boardgame.io/server` import, see boardgame-io-server.d.ts).
 import { INVALID_MOVE } from 'boardgame.io/dist/cjs/core.js';
-import { generals, STAGE_CHOOSE_GENERAL, THREE_KINGDOMS_GAME_NAME } from '@3k/shared';
+import {
+  generals,
+  STAGE_CHOOSE_GENERAL,
+  THREE_KINGDOMS_GAME_NAME,
+  THREE_KINGDOMS_MAX_PLAYERS,
+  THREE_KINGDOMS_MIN_PLAYERS,
+} from '@3k/shared';
 import type { CardId, GState, PlayerId } from '../engine/state.js';
 import { completeSelection, initGame, initSelection } from '../engine/setup.js';
 import { applyPick, isSelectionComplete } from '../engine/selection.js';
@@ -49,6 +55,39 @@ export interface ThreeKingdomsSetupData {
    * players choose). If both are omitted, the first N generals in
    * content/standard/generals.json are assigned in player order. */
   generalIds?: Record<PlayerId, string>;
+}
+
+/**
+ * An already-over, empty match — what setup() returns instead of THROWING when
+ * asked for an impossible player count. Found live in 7.2's first deploy: a
+ * redeploy wipes the in-memory match store, a stale browser tab then re-syncs
+ * to its old matchID, and boardgame.io's Master.onSync RE-CREATES the missing
+ * match on the fly with its own default numPlayers — which is 2. initGame's
+ * assert threw, the throw escaped onSync, and THE WHOLE SERVER PROCESS DIED —
+ * a crash loop, re-armed by every stale tab, after every restart. A tombstone
+ * instead: the stale client renders a finished game (its lobby session then
+ * 404s and drops), and everyone else's server stays up.
+ */
+function tombstoneState(): GState {
+  return {
+    drawPile: [],
+    discardPile: [],
+    revealed: [],
+    players: {},
+    seats: [],
+    activeSeat: 0,
+    turnPhase: 'end',
+    skipPhases: [],
+    turnFlags: { strikesPlayed: 0, strikeLimit: 1 },
+    stack: [],
+    pending: null,
+    selection: null,
+    damage: null,
+    demand: null,
+    judgement: null,
+    log: [],
+    gameOver: { winners: [], condition: 'lord' },
+  };
 }
 
 function defaultGeneralIds(playerIds: readonly PlayerId[]): Record<PlayerId, string> {
@@ -189,6 +228,16 @@ export const ThreeKingdomsGame: Game<GState, Record<string, unknown>, ThreeKingd
       ctx.playOrder.length > 0
         ? ctx.playOrder
         : Array.from({ length: ctx.numPlayers }, (_, i) => String(i));
+
+    // MUST NOT THROW past this point on a bad player count — see
+    // tombstoneState()'s header. This guard runs before either setup path
+    // (selection or direct deal), because both assert 4–8 downstream.
+    if (
+      playerIds.length < THREE_KINGDOMS_MIN_PLAYERS ||
+      playerIds.length > THREE_KINGDOMS_MAX_PLAYERS
+    ) {
+      return tombstoneState();
+    }
 
     const rng = makeRng(random as BgioRandomLike);
 
