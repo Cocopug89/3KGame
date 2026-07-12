@@ -125,6 +125,7 @@
   "lobby.room_full": "人齐了，可以入座。",
   "lobby.enter_table": "进入牌桌",
   "lobby.leave": "离开房间",
+  "lobby.rematch": "再来一局",
   "lobby.connecting": "连接中…",
   "lobby.error.room_not_found": "没有找到这个房间。",
   "lobby.error.seat_taken": "这个座位刚被人坐了。",

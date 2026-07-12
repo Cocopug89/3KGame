@@ -20,10 +20,13 @@ export const dodge: CardEffect = {
     self: 'only',
   },
 
-  // Whether a player can produce a 闪 is the demand's call ({t:'demandAsk'}
-  // folds queries.cardsAs over their hand); there is no separate turn-based
-  // rule gating when 闪 may be played the way strikeLimit gates 杀.
-  canPlay: () => true,
+  // 闪 is PURELY REACTIVE: it answers a {t:'demand', kind:'dodge'} and nothing
+  // else. canPlay gates only the proactive action-phase playCard path, and that
+  // path must always refuse — this was `() => true` until the first live
+  // playtest (7.2) showed a player could burn a 闪 from the action phase for
+  // zero effect. The demand path never consults canPlay (supplyCards validates
+  // through queries.cardsAs), so answering a 杀 is unaffected.
+  canPlay: () => false,
 
   resolve: () => [],
 };

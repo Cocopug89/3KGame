@@ -14,6 +14,7 @@ import {
 } from '../../game/interaction';
 import type { Selection } from '../../game/interaction';
 import {
+  autoTargets,
   candidateTargets,
   livingOthers as countLivingOthers,
   promptFor,
@@ -90,10 +91,25 @@ export function GameTable({ state, viewerId, actions, rejected = false }: GameTa
     selection.cards.length > 0 ? (targetRange(selection.cards[0], livingOthers)?.max ?? 0) : 0;
 
   const onToggleCard = (cardId: string) =>
-    setSelection((cur) => (prompt ? toggleCard(cur, prompt, cardId) : cur));
+    setSelection((cur) => {
+      if (!prompt) return cur;
+      const next = toggleCard(cur, prompt, cardId);
+      // AoE tricks (南蛮/万箭/桃园) hit every eligible seat by rule — fill the
+      // targets in the same click, so the player never has to pick them.
+      if (viewerId && prompt.kind === 'act' && next.cards[0] === cardId) {
+        const auto = autoTargets(state, viewerId, cardId);
+        if (auto) return { ...next, targets: auto };
+      }
+      return next;
+    });
 
   const onTarget = (playerId: string) =>
-    setSelection((cur) => toggleTarget(cur, playerId, maxTargets));
+    setSelection((cur) => {
+      // An AoE's target list is the rulebook's, not the player's — seat clicks
+      // must not carve seats out of it.
+      if (viewerId && cur.cards[0] && autoTargets(state, viewerId, cur.cards[0])) return cur;
+      return toggleTarget(cur, playerId, maxTargets);
+    });
 
   const onChooseSlot = (slot: CardSlot) => setSelection((cur) => chooseSlot(cur, slot));
 

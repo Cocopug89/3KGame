@@ -52,11 +52,25 @@ import type {
 import { SUITS, isSelfPending, isSelfView } from './viewTypes.js';
 
 /** Effects the server can actually resolve today (server/src/content/effectRegistry.ts).
- * Anything else is in the deck but not yet implemented — Phase 3 adds tricks and
- * equipment, Phase 4 skills — so the hand greys it out rather than letting the
- * player fire a move that the registry will reject. Delete entries from the
- * "unimplemented" side by adding them here as each effect lands. */
-export const IMPLEMENTED_EFFECT_KEYS: readonly string[] = ['strike', 'dodge', 'peach'];
+ * As of Phase 3/4 that is the ENTIRE standard deck — every trick and all 13
+ * equipment effectKeys resolve server-side. This list must mirror the registry's
+ * player-playable keys: the first live playtest (7.2) found it still frozen at
+ * the Phase 2 basics, which greyed out every trick and equipment card in the
+ * deployed client while the bots (which bypass the UI) played them fine.
+ * `nullification` is listed because it must be SUPPLIABLE to a demand — playing
+ * it proactively in the action phase is blocked in cardBlock() below instead. */
+export const IMPLEMENTED_EFFECT_KEYS: readonly string[] = [
+  // basics
+  'strike', 'dodge', 'peach',
+  // tricks (task 3.3/3.4)
+  'nullification', 'dismantle', 'steal', 'draw_two', 'duel',
+  'barbarian_invasion', 'raining_arrows', 'peach_garden', 'duress',
+  'indulgence', 'lightning', 'harvest',
+  // equipment (task 3.5/3.6) — one shared server effect, 13 effectKeys
+  'zhuge_crossbow', 'gender_swords', 'blue_steel_sword', 'frost_blade',
+  'rock_cleaving_axe', 'green_dragon_blade', 'serpent_spear', 'heaven_scorcher',
+  'unicorn_bow', 'eight_trigrams', 'renwang_shield', 'plus_horse', 'minus_horse',
+];
 
 export function isImplemented(cardId: string): boolean {
   const card = cardById(cardId);
@@ -87,10 +101,43 @@ const DEMAND_DECLINE_KEYS: Record<string, string> = {
   peach: 'prompt.decline_peach',
 };
 
+const NO_TARGET: TargetHint = { min: 0, max: 0, self: 'only' };
+const ONE_OTHER: TargetHint = { min: 1, max: 1, self: 'forbidden' };
+
 const TARGET_HINTS: Record<string, TargetHint> = {
-  strike: { min: 1, max: 1, self: 'forbidden' },
-  peach: { min: 0, max: 0, self: 'only' }, // played on yourself; no seat to pick
-  dodge: { min: 0, max: 0, self: 'only' },
+  // basics
+  strike: ONE_OTHER,
+  peach: NO_TARGET, // played on yourself; no seat to pick
+  dodge: NO_TARGET,
+  // tricks — mirrored 1:1 from each effect's TargetSpec in
+  // server/src/content/effects/*.ts (predicate/inRange stay server-side;
+  // see the header — the server refuses what the picker over-offers).
+  nullification: NO_TARGET,
+  dismantle: ONE_OTHER,
+  steal: ONE_OTHER,
+  draw_two: NO_TARGET,
+  duel: ONE_OTHER,
+  barbarian_invasion: { min: 1, max: 'all_others', self: 'forbidden' },
+  raining_arrows: { min: 1, max: 'all_others', self: 'forbidden' },
+  peach_garden: { min: 1, max: 'all', self: 'allowed' },
+  duress: { min: 2, max: 2, self: 'allowed' },
+  indulgence: ONE_OTHER,
+  lightning: NO_TARGET,
+  harvest: NO_TARGET,
+  // equipment — "equipping IS the effect", always self, no seat to pick
+  zhuge_crossbow: NO_TARGET,
+  gender_swords: NO_TARGET,
+  blue_steel_sword: NO_TARGET,
+  frost_blade: NO_TARGET,
+  rock_cleaving_axe: NO_TARGET,
+  green_dragon_blade: NO_TARGET,
+  serpent_spear: NO_TARGET,
+  heaven_scorcher: NO_TARGET,
+  unicorn_bow: NO_TARGET,
+  eight_trigrams: NO_TARGET,
+  renwang_shield: NO_TARGET,
+  plus_horse: NO_TARGET,
+  minus_horse: NO_TARGET,
 };
 
 export function targetHint(cardId: string): TargetHint | null {
@@ -469,6 +516,9 @@ export function cardBlock(
   if (!IMPLEMENTED_EFFECT_KEYS.includes(card.effectKey)) return 'not_implemented';
 
   if (prompt.kind === 'act') {
+    // 闪 and 无懈可击 are only ever RESPONSES (their canPlay() is false) —
+    // offering either in the action phase would be a guaranteed rejection.
+    if (card.effectKey === 'dodge' || card.effectKey === 'nullification') return 'wrong_card';
     if (card.effectKey === 'strike' && state.turnFlags.strikesPlayed >= state.turnFlags.strikeLimit) {
       return 'strike_limit';
     }
@@ -500,6 +550,24 @@ export function candidateTargets(
     if (id === viewerId) return hint.self !== 'forbidden';
     return hint.self !== 'only';
   });
+}
+
+/**
+ * AoE tricks (南蛮入侵 · 万箭齐发 · 桃园结义) target every eligible seat
+ * AUTOMATICALLY — the rulebook gives the player no choice, so the UI must not
+ * ask (7.2 playtest feedback: manual seat-clicking read as broken). Returns the
+ * full eligible list for an all-targets card, or null for a card where the
+ * player genuinely chooses (借刀杀人's two seats stay manual). GameTable fills
+ * the selection with this on card pick and ignores seat clicks while it holds.
+ */
+export function autoTargets(
+  state: TableState,
+  viewerId: string,
+  cardId: string,
+): string[] | null {
+  const hint = targetHint(cardId);
+  if (!hint || (hint.max !== 'all_others' && hint.max !== 'all')) return null;
+  return candidateTargets(state, viewerId, cardId);
 }
 
 export function livingOthers(state: TableState, viewerId: string): number {

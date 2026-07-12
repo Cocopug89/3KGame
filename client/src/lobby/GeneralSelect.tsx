@@ -42,6 +42,13 @@ export function GeneralSelect({ selection, viewerId, onPick }: GeneralSelectProp
             })
           : t('select.lord_picking', { player: `#${selection.lord}` })}
       </p>
+      {lordGeneral ? (
+        <p style={{ color: '#666', fontSize: '0.85rem', marginTop: '-0.5rem' }}>
+          {lordGeneral.skillIds
+            .map((sid) => `${t(`skill.${sid}.name`)}：${t(`skill.${sid}.desc`)}`)
+            .join(' ／ ')}
+        </p>
+      ) : null}
 
       {myTurn ? (
         <ul style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', listStyle: 'none', padding: 0 }}>
@@ -58,6 +65,7 @@ export function GeneralSelect({ selection, viewerId, onPick }: GeneralSelectProp
                     textAlign: 'left',
                     padding: '0.6rem 0.8rem',
                     minWidth: '9rem',
+                    maxWidth: '20rem',
                     cursor: 'pointer',
                   }}
                 >
@@ -71,6 +79,23 @@ export function GeneralSelect({ selection, viewerId, onPick }: GeneralSelectProp
                       n: general.maxHp + (isLord ? 1 : 0),
                     })}
                   </span>
+                  {/* 7.2 UX: the skills ARE the choice — nobody can pick a
+                      general blind off a name and an hp number. Full text, not
+                      a tooltip: this is the one screen where it's all read. */}
+                  {general.skillIds.map((sid) => (
+                    <span
+                      key={sid}
+                      style={{
+                        display: 'block',
+                        marginTop: '0.35rem',
+                        fontSize: '0.8rem',
+                        color: '#444',
+                        whiteSpace: 'normal',
+                      }}
+                    >
+                      <strong>{t(`skill.${sid}.name`)}</strong> — {t(`skill.${sid}.desc`)}
+                    </span>
+                  ))}
                 </button>
               </li>
             );

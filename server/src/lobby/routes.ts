@@ -65,4 +65,11 @@ export function registerRoomRoutes(router: RoomRouterLike, api: RoomApi): void {
   router.get('/rooms/:code', async (ctx) => {
     await respond(ctx, () => api.describeRoom(ctx.params.code));
   });
+
+  /** POST /rooms/WUXIN/rematch → a NEW match behind the same code (7.2).
+   * 409 while the current match is still running — which is also the answer
+   * the second of two racing rematch clicks gets. */
+  router.post('/rooms/:code/rematch', async (ctx) => {
+    await respond(ctx, () => api.rematch(ctx.params.code));
+  });
 }

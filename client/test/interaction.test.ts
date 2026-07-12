@@ -10,6 +10,7 @@ import { FIXTURES } from '../src/game/fixtures';
 import {
   CARD_BLOCK_I18N_KEY,
   IMPLEMENTED_EFFECT_KEYS,
+  autoTargets,
   candidateTargets,
   cardBlock,
   isImplemented,
@@ -174,13 +175,20 @@ describe('cardBlock — which cards can answer this prompt', () => {
     expect(cardBlock(spent, viewer, prompt, idOf('strike'))).toBe('strike_limit');
   });
 
-  it('greys out cards whose effect the server cannot resolve yet', () => {
+  it('offers the whole deck now that Phase 3/4 implemented every effect', () => {
     const { state, viewerId } = fx('4p · discard');
     const viewer = viewerIn(state, viewerId);
     const act = promptFor(fx('4p · opening').state, '0')!;
-    // 决斗 is in the deck but Phase 3 hasn't implemented it.
-    expect(IMPLEMENTED_EFFECT_KEYS).not.toContain('duel');
-    expect(cardBlock(state, viewer, act, idOf('duel'))).toBe('not_implemented');
+    // The 7.2 live playtest found this list frozen at the Phase 2 basics,
+    // which made every trick and equipment card unplayable in the deployed
+    // client. 决斗 stands in for the tricks; 八卦阵 for equipment.
+    expect(IMPLEMENTED_EFFECT_KEYS).toContain('duel');
+    expect(cardBlock(state, viewer, act, idOf('duel'))).toBeNull();
+    expect(IMPLEMENTED_EFFECT_KEYS).toContain('eight_trigrams');
+    // 闪 and 无懈可击 are response-only: never playable proactively in the
+    // action phase (7.2 playtest: a 闪 could be burned from hand for nothing).
+    expect(cardBlock(state, viewer, act, idOf('nullification'))).toBe('wrong_card');
+    expect(cardBlock(state, viewer, act, idOf('dodge'))).toBe('wrong_card');
   });
 
   it('lets an unimplemented card be *discarded* — discarding is card-agnostic', () => {
@@ -214,8 +222,32 @@ describe('targeting', () => {
     expect(targetRange(idOf('peach'), 3)).toEqual({ min: 0, max: 0 });
   });
 
-  it('has no target hint for an unimplemented card, so it cannot be submitted', () => {
-    expect(targetRange(idOf('duel'), 3)).toBeNull();
+  it('has a target hint for EVERY deck card — a missing hint makes a card unsubmittable', () => {
+    // canSubmit() returns false for any card without a hint, which is exactly
+    // how the whole deck ended up unplayable in the 7.2 live playtest. Pin the
+    // full deck so an expansion card can't silently reopen the gap.
+    for (const card of cards) {
+      expect(targetRange(card.id, 3), `no TARGET_HINTS entry for ${card.effectKey}`).not.toBeNull();
+    }
+    expect(targetRange(idOf('duel'), 3)).toEqual({ min: 1, max: 1 });
+    expect(targetRange(idOf('barbarian_invasion'), 3)).toEqual({ min: 1, max: 3 });
+  });
+
+  it('auto-targets the AoE tricks — the rulebook gives the player no choice (7.2)', () => {
+    const { state } = fx('8p · midgame');
+    // 南蛮入侵/万箭齐发: every living OTHER, dead seats excluded, never self.
+    const aoe = autoTargets(state, '2', idOf('barbarian_invasion'));
+    expect(aoe).not.toBeNull();
+    expect(aoe).not.toContain('2');
+    expect(aoe).not.toContain('5'); // dead
+    expect(aoe).toHaveLength(livingOthers(state, '2'));
+    // 桃园结义: everyone, including the player who plays it.
+    const garden = autoTargets(state, '2', idOf('peach_garden'));
+    expect(garden).toContain('2');
+    expect(garden).toHaveLength(livingOthers(state, '2') + 1);
+    // Cards with a real choice stay manual.
+    expect(autoTargets(state, '2', idOf('strike'))).toBeNull();
+    expect(autoTargets(state, '2', idOf('duress'))).toBeNull();
   });
 });
 

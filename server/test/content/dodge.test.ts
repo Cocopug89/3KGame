@@ -3,9 +3,9 @@ import { dodge } from '../../src/content/effects/dodge.js';
 import { makeGState } from '../engine/fixtures.js';
 
 describe('dodge', () => {
-  it('canPlay is always true (hand-possession is the respondDodge move\'s job)', () => {
+  it('canPlay is always FALSE — 闪 is purely reactive, never an action-phase play (7.2)', () => {
     const G = makeGState();
-    expect(dodge.canPlay(G, '0')).toBe(true);
+    expect(dodge.canPlay(G, '0')).toBe(false);
   });
 
   it('resolve() is a documented no-op — strike\'s own resolve() handles the actual outcome', () => {

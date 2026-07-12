@@ -45,6 +45,11 @@ export function GeneralGallery() {
                   <div style={{ fontSize: '0.75rem', color: '#666' }}>
                     {t('ui.max_hp')}: {general.maxHp}
                   </div>
+                  {general.skillIds.map((sid) => (
+                    <div key={sid} style={{ fontSize: '0.72rem', color: '#555', marginTop: '0.3rem' }}>
+                      <strong>{t(`skill.${sid}.name`)}</strong> — {t(`skill.${sid}.desc`)}
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>

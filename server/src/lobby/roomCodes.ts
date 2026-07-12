@@ -107,6 +107,25 @@ export class RoomRegistry {
     return this.byCode.get(normalizeRoomCode(rawCode));
   }
 
+  /** Points an existing code at a NEW match — the rematch path (7.2). The code
+   * is the table's identity for the humans sitting at it ("room WUXIN"), so it
+   * must survive the match it was minted for. Refreshes createdAt so prune()
+   * measures the room's age from the rematch, not from the first game. */
+  rebind(rawCode: string, newMatchID: string): Room | undefined {
+    const code = normalizeRoomCode(rawCode);
+    const room = this.byCode.get(code);
+    if (!room) return undefined;
+    const existing = this.byMatchId.get(newMatchID);
+    if (existing) {
+      throw new Error(`RoomRegistry.rebind: match ${newMatchID} already has code ${existing}`);
+    }
+    this.byMatchId.delete(room.matchID);
+    const next: Room = { ...room, matchID: newMatchID, createdAt: this.now() };
+    this.byCode.set(code, next);
+    this.byMatchId.set(newMatchID, code);
+    return next;
+  }
+
   codeForMatch(matchID: string): string | undefined {
     return this.byMatchId.get(matchID);
   }

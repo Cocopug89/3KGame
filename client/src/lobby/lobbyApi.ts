@@ -58,6 +58,19 @@ export async function fetchRoom(code: string): Promise<RoomSummary> {
   return readRoom(res);
 }
 
+/** 7.2's rematch: a NEW match behind the same code. A 409 means somebody else
+ * already pressed the button — not an error the player needs to see; return
+ * the room as it now stands and the caller's poll does the rest. */
+export async function rematchRoom(code: string): Promise<RoomSummary> {
+  const res = await fetch(`${LOBBY_URL}/rooms/${encodeURIComponent(code)}/rematch`, {
+    method: 'POST',
+  }).catch(() => {
+    throw new LobbyError('lobby.error.network');
+  });
+  if (res.status === 409) return fetchRoom(code);
+  return readRoom(res);
+}
+
 export interface JoinResult {
   playerID: string;
   credentials: string;

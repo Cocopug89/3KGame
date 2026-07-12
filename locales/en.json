@@ -125,6 +125,7 @@
   "lobby.room_full": "Everyone's here — take your seats.",
   "lobby.enter_table": "Enter the table",
   "lobby.leave": "Leave room",
+  "lobby.rematch": "Rematch",
   "lobby.connecting": "Connecting…",
   "lobby.error.room_not_found": "No room with that code.",
   "lobby.error.seat_taken": "Someone just took that seat.",

@@ -130,6 +130,46 @@ export class RoomApi {
     return this.summarize(room.code, room.matchID, room.createdAt, metadata);
   }
 
+  /**
+   * 7.2: "再来一局" — a NEW match behind the SAME room code. Only a finished
+   * match may be rematched (409 otherwise), which is also what makes two
+   * players racing the button safe: the first click rebinds the code to a
+   * fresh, unfinished match, so the second click gets the 409 and its client
+   * just refetches the room. Seats are NOT copied over — each client re-joins
+   * its old seat index with its stored name (LobbyPage's game-over poll), so
+   * credentials are minted the normal way through bgio's own /join, never
+   * cloned across matches.
+   */
+  async rematch(rawCode: string): Promise<RoomSummary> {
+    const room = this.rooms.resolve(rawCode);
+    if (!room) throw new RoomError(404, 'room not found');
+
+    const { state, metadata } = await this.db.fetch(room.matchID, {
+      state: true,
+      metadata: true,
+    });
+    if (!metadata) {
+      this.rooms.release(room.code);
+      throw new RoomError(404, 'room not found');
+    }
+    if (!state?.G?.gameOver) throw new RoomError(409, 'match still running');
+
+    const match = createMatch({
+      game: this.game,
+      numPlayers: room.numPlayers,
+      setupData: { selectGenerals: true },
+      unlisted: true,
+    });
+    if ('setupDataError' in match) throw new RoomError(400, match.setupDataError);
+
+    const matchID = this.uuid();
+    await this.db.createMatch(matchID, match);
+    const rebound = this.rooms.rebind(room.code, matchID);
+    if (!rebound) throw new RoomError(404, 'room not found'); // raced a prune
+
+    return this.summarize(rebound.code, matchID, rebound.createdAt, match.metadata);
+  }
+
   private summarize(
     roomCode: string,
     matchID: string,

@@ -18,6 +18,7 @@ import {
   joinSeat,
   leaveSeat,
   loadSession,
+  rematchRoom,
   saveSession,
   type LobbySession,
   type RoomSummary,
@@ -42,6 +43,9 @@ export function LobbyPage() {
   // at the table instead of at the seat list. The socket re-attaches with the
   // credentials we already hold — see lobbyApi's "re-attach, never re-join".
   const [atTable, setAtTable] = useState(() => loadSession()?.atTable === true);
+  // 7.2's rematch: set by the board's onGameOver, cleared when the new match's
+  // seat has been re-taken (or the player walks back to the lobby).
+  const [gameEnded, setGameEnded] = useState(false);
 
   const run = useCallback(async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -93,17 +97,75 @@ export function LobbyPage() {
     setAtTable(true);
   };
 
+  // 7.2's rematch, the client half. Once the board reports gameOver, watch the
+  // room code: the moment ANY player's rematch rebinds it to a fresh match,
+  // every client re-takes its own seat on that match with the name it already
+  // has — new credentials through bgio's own /join, never cloned — and the
+  // table remounts into the new game's general-selection window.
+  useEffect(() => {
+    if (!session || !atTable || !gameEnded) return;
+    const id = window.setInterval(() => {
+      void fetchRoom(session.roomCode)
+        .then(async (summary) => {
+          if (summary.matchID === session.matchID) return; // no rematch yet
+          const { credentials } = await joinSeat(
+            summary.matchID,
+            session.playerID,
+            session.playerName,
+          );
+          const next: LobbySession = { ...session, matchID: summary.matchID, credentials, atTable: true };
+          saveSession(next);
+          setSession(next);
+          setRoom(summary);
+          setGameEnded(false);
+        })
+        .catch(() => {
+          /* transient — the next tick retries; a raced /join lands on the
+             same seat and the first success already swapped the session */
+        });
+    }, POLL_MS);
+    return () => window.clearInterval(id);
+  }, [session, atTable, gameEnded]);
+
+  const onRematch = () =>
+    run(async () => {
+      if (!session) return;
+      await rematchRoom(session.roomCode); // 409 = someone beat us to it; fine
+    });
+
+  const onExitTable = () => {
+    dropSession();
+    setRoom(null);
+    setGameEnded(false);
+  };
+
   // Note there is no "leave" here: bgio's /leave destroys the match once the
   // last named player is gone, so a mid-game exit would risk taking the table
   // with it. A player who wants out closes the tab; their seat stays in the
-  // game, and the same session brings them back to it.
+  // game, and the same session brings them back to it. The one exception is
+  // the game-over screen below — the match is decided, so walking away is
+  // finally safe.
   if (session && atTable) {
     return (
       <Shell>
         <p>
           {t('lobby.room_code')}: <strong>{session.roomCode}</strong>
         </p>
-        <TableView session={session} />
+        {gameEnded && (
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+            <button type="button" disabled={busy} onClick={onRematch}>
+              {t('lobby.rematch')}
+            </button>
+            <button type="button" disabled={busy} onClick={onExitTable}>
+              {t('lobby.leave')}
+            </button>
+          </div>
+        )}
+        <TableView
+          key={session.matchID}
+          session={session}
+          onGameOver={() => setGameEnded(true)}
+        />
       </Shell>
     );
   }

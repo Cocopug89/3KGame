@@ -14,6 +14,8 @@
 // server and lets it answer (an illegal one comes back as INVALID_MOVE, which
 // the prompt panel surfaces).
 
+import { useEffect } from 'react';
+import type { ComponentType } from 'react';
 import { Client } from 'boardgame.io/react';
 import type { BoardProps } from 'boardgame.io/react';
 import { SocketIO } from 'boardgame.io/multiplayer';
@@ -78,8 +80,22 @@ function tableActions(moves: Moves): TableActions {
  * destroyed match at worst. The credentials in the stored session ARE the
  * reconnection (lobbyApi.ts).
  */
-export function TableBoard({ G, playerID, moves, isConnected }: BoardProps<TableState>) {
+export function TableBoard({
+  G,
+  playerID,
+  moves,
+  isConnected,
+  onGameOver,
+}: BoardProps<TableState> & { onGameOver?: () => void }) {
   const { t } = useTranslation();
+
+  // 7.2's rematch: the board is the only thing that sees G.gameOver, and the
+  // lobby (which owns the session) is the only thing that can act on it — so
+  // this hook is the entire bridge between the two.
+  const over = Boolean(G?.players && G.gameOver);
+  useEffect(() => {
+    if (over) onGameOver?.();
+  }, [over, onGameOver]);
 
   // Before the first sync, G is the client's own (empty) initial state.
   if (!G?.players) {
@@ -106,19 +122,34 @@ export function TableBoard({ G, playerID, moves, isConnected }: BoardProps<Table
   );
 }
 
+// bgio's react Client FORWARDS any extra element props to the board at
+// runtime (documented behaviour), but its own prop types don't admit them —
+// hence the cast, which is also where `onGameOver` gets its real type.
 const ThreeKingdomsClient = Client<TableState>({
   game: ThreeKingdomsClientGame,
   board: TableBoard,
   multiplayer: SocketIO({ server: SERVER_URL }),
   debug: false,
-});
+}) as unknown as ComponentType<{
+  matchID: string;
+  playerID: string;
+  credentials: string;
+  onGameOver?: () => void;
+}>;
 
-export function TableView({ session }: { session: LobbySession }) {
+export function TableView({
+  session,
+  onGameOver,
+}: {
+  session: LobbySession;
+  onGameOver?: () => void;
+}) {
   return (
     <ThreeKingdomsClient
       matchID={session.matchID}
       playerID={session.playerID}
       credentials={session.credentials}
+      onGameOver={onGameOver}
     />
   );
 }

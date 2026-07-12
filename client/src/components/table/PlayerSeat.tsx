@@ -45,6 +45,13 @@ export function PlayerSeat({
   const generalName = general ? localizedName(general, i18n.language) : player.generalId;
   const roleKey = roleI18nKey(player, isViewer);
 
+  // 7.2 UX: skills visible at the table — names always, full text on hover —
+  // so nobody plays blind against a general they don't know.
+  const skillIds = general?.skillIds ?? [];
+  const skillTip = skillIds
+    .map((sid) => `${t(`skill.${sid}.name`)}：${t(`skill.${sid}.desc`)}`)
+    .join('\n');
+
   const pickable = targetable && onTarget != null;
 
   return (
@@ -68,7 +75,7 @@ export function PlayerSeat({
       onClick={pickable ? () => onTarget(seatView.playerId) : undefined}
     >
       <div className="seat__head">
-        <span className="seat__general">{generalName}</span>
+        <span className="seat__general" title={skillTip || undefined}>{generalName}</span>
         <span className="seat__seatno">{t('ui.seat', { seat: player.seat + 1 })}</span>
         {isViewer ? <span className="badge badge--you">{t('ui.you')}</span> : null}
       </div>
@@ -82,6 +89,16 @@ export function PlayerSeat({
           {t('ui.hand')} · {t('ui.cards_count', { n: handSize(player) })}
         </span>
       </div>
+
+      {skillIds.length > 0 ? (
+        <div
+          className="seat__skills"
+          title={skillTip}
+          style={{ fontSize: '0.72rem', color: '#667', margin: '0.15rem 0' }}
+        >
+          {skillIds.map((sid) => t(`skill.${sid}.name`)).join(' · ')}
+        </div>
+      ) : null}
 
       <HpBar hp={player.hp} maxHp={player.maxHp} dying={dying} dead={dead} />
 
