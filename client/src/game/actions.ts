@@ -14,6 +14,10 @@ export interface TableActions {
   playCard(cardId: string, targets: string[]): void;
   /** End the action phase. The only move that advances the turn. */
   pass(): void;
+  /** 7.2: start an ACTIVE skill (制衡/仁德/结姻/离间/反间/青囊/苦肉) during your
+   * own action phase. `cardIds` are the COST (may be empty — 反间/苦肉),
+   * `targets` per the skill's own TargetSpec. Server validates everything. */
+  useSkill(skillId: string, cardIds: string[], targets: string[]): void;
   /**
    * Answer a card demand (task 4.1b) — 闪 to a 杀, 桃 to a dying player, 杀 to a
    * 决斗, 无懈可击 to a trick. ONE move for all of them; `respondDodge` and
@@ -73,6 +77,8 @@ export function recordingActions(sink: (intent: RecordedIntent) => void): TableA
   return {
     playCard: (cardId, targets) => sink({ move: 'playCard', args: [cardId, targets] }),
     pass: () => sink({ move: 'pass', args: [] }),
+    useSkill: (skillId, cardIds, targets) =>
+      sink({ move: 'useSkill', args: [skillId, cardIds, targets] }),
     supplyCards: (cardIds) => sink({ move: 'supplyCards', args: cardIds?.length ? [cardIds] : [] }),
     respondSkill: (use) => sink({ move: 'respondSkill', args: [use] }),
     discard: (cardIds) => sink({ move: 'discard', args: [cardIds] }),

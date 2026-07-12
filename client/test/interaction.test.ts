@@ -28,6 +28,8 @@ import {
   sameSlot,
   selectionKey,
   toggleCard,
+  toggleSkill,
+  toggleSkillCard,
   toggleTarget,
 } from '../src/game/interaction';
 import { LOG_KEYS, resolveLogParams } from '../src/game/log';
@@ -248,6 +250,47 @@ describe('targeting', () => {
     // Cards with a real choice stay manual.
     expect(autoTargets(state, '2', idOf('strike'))).toBeNull();
     expect(autoTargets(state, '2', idOf('duress'))).toBeNull();
+  });
+});
+
+describe('active skills (7.2 — useSkill finally has a UI)', () => {
+  const actPrompt = promptFor(fx('4p · opening').state, '0')!;
+  const base = EMPTY_SELECTION;
+
+  it('toggleSkill arms/disarms and clears cards+targets either way', () => {
+    const armed = toggleSkill({ ...base, cards: ['x'], targets: ['1'] }, 'zhiheng');
+    expect(armed.skill).toBe('zhiheng');
+    expect(armed.cards).toEqual([]);
+    expect(armed.targets).toEqual([]);
+    expect(toggleSkill(armed, 'zhiheng').skill).toBeNull();
+  });
+
+  it('toggleSkillCard is a cost picker: any card, capped at the exact cost', () => {
+    let s = toggleSkillCard({ ...base, skill: 'jieyin' }, 'a', 2);
+    s = toggleSkillCard(s, 'b', 2);
+    expect(s.cards).toEqual(['a', 'b']);
+    expect(toggleSkillCard(s, 'c', 2).cards).toEqual(['a', 'b']); // full — ignored
+    expect(toggleSkillCard(s, 'b', 2).cards).toEqual(['a']); // toggle off
+    // cap 1 replaces instead of refusing, same as toggleCard's rule
+    expect(toggleSkillCard({ ...base, skill: 'lijian', cards: ['a'] }, 'b', 1).cards).toEqual(['b']);
+  });
+
+  it('canSubmit follows the armed skill, mirroring the server specs exactly', () => {
+    // 结姻: exactly 2 cards, 1 target
+    expect(canSubmit(actPrompt, { ...base, skill: 'jieyin', cards: ['a', 'b'], targets: ['1'] }, 3)).toBe(true);
+    expect(canSubmit(actPrompt, { ...base, skill: 'jieyin', cards: ['a'], targets: ['1'] }, 3)).toBe(false);
+    expect(canSubmit(actPrompt, { ...base, skill: 'jieyin', cards: ['a', 'b'], targets: [] }, 3)).toBe(false);
+    // 离间: exactly 1 card, exactly 2 targets
+    expect(canSubmit(actPrompt, { ...base, skill: 'lijian', cards: ['a'], targets: ['1', '2'] }, 3)).toBe(true);
+    expect(canSubmit(actPrompt, { ...base, skill: 'lijian', cards: ['a'], targets: ['1'] }, 3)).toBe(false);
+    // 制衡: any number of cards INCLUDING zero, no targets
+    expect(canSubmit(actPrompt, { ...base, skill: 'zhiheng' }, 3)).toBe(true);
+    // 仁德: at least one card given
+    expect(canSubmit(actPrompt, { ...base, skill: 'rende', targets: ['1'] }, 3)).toBe(false);
+    expect(canSubmit(actPrompt, { ...base, skill: 'rende', cards: ['a'], targets: ['1'] }, 3)).toBe(true);
+    // 反间/苦肉: no cards
+    expect(canSubmit(actPrompt, { ...base, skill: 'fanjian', targets: ['1'] }, 3)).toBe(true);
+    expect(canSubmit(actPrompt, { ...base, skill: 'kurou' }, 3)).toBe(true);
   });
 });
 

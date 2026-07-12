@@ -42,12 +42,20 @@ export function ChoicePanel({ state, targetId, choices, selected, onChoose }: Ch
   const hand = choices.filter((c) => c.z === 'hand');
   const equip = choices.filter((c) => c.z === 'equip');
   const judgement = choices.filter((c) => c.z === 'judgementZone');
+  // 五谷丰登's pool (7.2's live-playtest stall): public cards, face up, not
+  // anyone's — so when the choices are ALL from the pool, the "{player}'s
+  // cards" header would be a lie and is swapped for the pool's own label.
+  const revealed = choices.filter((c) => c.z === 'revealed');
 
   const isOn = (slot: CardSlot) => sameSlot(selected, slot);
 
   return (
     <div className="choices">
-      <div className="choices__label">{t('prompt.their_cards', { player: name })}</div>
+      <div className="choices__label">
+        {revealed.length === choices.length
+          ? t('ui.revealed_pool')
+          : t('prompt.their_cards', { player: name })}
+      </div>
 
       <div className="choices__zones">
         {hand.length > 0 ? (
@@ -106,6 +114,25 @@ export function ChoicePanel({ state, targetId, choices, selected, onChoose }: Ch
                 slot.z === 'judgementZone' ? (
                   <CardFace
                     key={`judge-${slot.cardId}`}
+                    cardId={slot.cardId}
+                    size="md"
+                    selected={isOn(slot)}
+                    onClick={() => onChoose(slot)}
+                  />
+                ) : null,
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        {revealed.length > 0 ? (
+          <div className="choices__zone">
+            <span className="choices__zone-label">{t('ui.revealed_pool')}</span>
+            <div className="choices__cards">
+              {revealed.map((slot) =>
+                slot.z === 'revealed' ? (
+                  <CardFace
+                    key={`revealed-${slot.cardId}`}
                     cardId={slot.cardId}
                     size="md"
                     selected={isOn(slot)}

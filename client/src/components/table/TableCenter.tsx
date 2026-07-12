@@ -50,6 +50,18 @@ export function TableCenter({
         ) : null}
       </div>
 
+      {/* 五谷丰登's face-up pool — public to the whole table, so EVERYONE
+          watches the picks disappear, not just the player choosing (7.2). */}
+      {state.revealed && state.revealed.length > 0 ? (
+        <div className="center__piles">
+          {state.revealed.map((cardId) => (
+            <div className="pile" key={cardId}>
+              <CardFace cardId={cardId} size="md" />
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       <div className="center__piles">
         <div className="pile">
           <CardBack size="md" />

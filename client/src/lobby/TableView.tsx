@@ -34,6 +34,7 @@ function tableActions(moves: Moves): TableActions {
   return {
     playCard: (cardId, targets) => moves.playCard(cardId, targets),
     pass: () => moves.pass(),
+    useSkill: (skillId, cardIds, targets) => moves.useSkill(skillId, cardIds, targets),
     // 4.1b: 闪 / 桃 / 杀 / 无懈可击 are one move now — the card demand
     // (docs/skill-trigger-design.md §5). respondDodge/respondPeach are gone.
     supplyCards: (cardIds) => moves.supplyCards(cardIds),

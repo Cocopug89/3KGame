@@ -124,7 +124,12 @@ export type Suit = (typeof SUITS)[number];
 export type CardSlot =
   | { z: 'hand'; index: number }
   | { z: 'equip'; cardId: CardId }
-  | { z: 'judgementZone'; cardId: CardId };
+  | { z: 'judgementZone'; cardId: CardId }
+  /** 五谷丰登's public pool (task 3.4) — face up by definition, named by id.
+   * Missing from this mirror until 7.2's live playtest hit it: the server
+   * offered these slots, ChoicePanel's zone filters dropped them all, and the
+   * table stalled on an empty picker. */
+  | { z: 'revealed'; cardId: CardId };
 
 /** The request, in full, when *you* are the one being asked. */
 export interface SelfPendingView {
@@ -178,6 +183,9 @@ export interface TableState {
   selection?: SelectionView | null;
   drawPileCount: number;
   discardPile: CardId[];
+  /** 五谷丰登's face-up pool — public and empty the rest of the time. Optional
+   * because the 6.1 fixtures predate it. */
+  revealed?: CardId[];
   players: Record<PlayerId, AnyPlayerView>;
   /** Seat order, index = seat number. Dead players stay in the array. */
   seats: PlayerId[];

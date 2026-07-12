@@ -3,7 +3,7 @@
 // submittable answer. Pure — no React — so every interaction rule below is
 // unit-tested rather than discovered by clicking.
 
-import { targetRange } from './prompts.js';
+import { ACTIVE_SKILL_HINTS, targetRange } from './prompts.js';
 import type { PromptView } from './prompts.js';
 import type { CardSlot } from './viewTypes.js';
 
@@ -34,6 +34,11 @@ export interface Selection {
   order?: string[];
   /** yijiDistribute (遗计): where each drawn card is going. */
   assignments?: { cardId: string; target: string }[];
+  /** 7.2: an ACTIVE skill (制衡/仁德/结姻/离间/反间/青囊/苦肉) being assembled
+   * during 'act'. Non-null switches the selection into skill mode: `cards` are
+   * the COST, `targets` come from the skill's own hint, and submit fires
+   * `useSkill` instead of `playCard`. */
+  skill?: string | null;
 }
 
 export const EMPTY_SELECTION: Selection = {
@@ -45,6 +50,7 @@ export const EMPTY_SELECTION: Selection = {
   suit: null,
   order: [],
   assignments: [],
+  skill: null,
 };
 
 /**
@@ -77,6 +83,33 @@ export function toggleCard(selection: Selection, prompt: PromptView, cardId: str
 // Same toggle-off rule as a card, for the same reason: a misclick must be
 // undoable without submitting. Each preserves the fields it does not own — 流离
 // needs a card AND a seat held at the same time.
+
+/** 7.2: arm (or disarm) an active skill. Cards and targets picked for a card
+ * play mean nothing to a skill (and vice versa), so both reset either way. */
+export function toggleSkill(selection: Selection, skillId: string): Selection {
+  return {
+    ...selection,
+    skill: selection.skill === skillId ? null : skillId,
+    cards: [],
+    targets: [],
+  };
+}
+
+/** Card picking while a skill is armed — a COST, so any card qualifies; the
+ * cap is the skill's exact cost (结姻 2, 离间 1) or unbounded (制衡/仁德). */
+export function toggleSkillCard(selection: Selection, cardId: string, cap: number): Selection {
+  const already = selection.cards.includes(cardId);
+  if (already) {
+    return { ...selection, cards: selection.cards.filter((c) => c !== cardId) };
+  }
+  if (selection.cards.length >= cap) {
+    // An exact-cost skill replaces the oldest pick rather than refusing the
+    // click, same as toggleCard's single-card rule.
+    if (cap === 1) return { ...selection, cards: [cardId] };
+    return selection;
+  }
+  return { ...selection, cards: [...selection.cards, cardId] };
+}
 
 /** 刚烈 · 洛神. */
 export function pickOption(selection: Selection, optionId: string): Selection {
@@ -162,6 +195,25 @@ export function canSubmit(
   // seats — and it has no decline path, so this is the only thing that ever
   // unblocks the engine.
   if (prompt.kind === 'chooseCard') return selection.slot != null;
+
+  // 7.2: an armed active skill answers 'act' through useSkill — complete when
+  // its own cost and target shape are, never the selected card's.
+  if (prompt.kind === 'act' && selection.skill) {
+    const hint = ACTIVE_SKILL_HINTS[selection.skill];
+    if (!hint) return false;
+    if (hint.cards === 'any') {
+      if (selection.cards.length < hint.minCards) return false;
+    } else if (selection.cards.length !== hint.cards) {
+      return false;
+    }
+    const max =
+      hint.targets.max === 'all_others'
+        ? livingOthersCount
+        : hint.targets.max === 'all'
+          ? livingOthersCount + 1
+          : hint.targets.max;
+    return selection.targets.length >= hint.targets.min && selection.targets.length <= max;
+  }
 
   // ── Batch B / C (4.3, 4.4). Each answers with its own shape, and each is
   // complete or it is not — there is no partial answer to submit.

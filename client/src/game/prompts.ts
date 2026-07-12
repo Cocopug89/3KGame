@@ -40,7 +40,7 @@
 //     server, the server wins and the player sees a rejection — which is the
 //     correct failure mode, and why nothing here is load-bearing.
 
-import { cardById } from './cardIndex.js';
+import { cardById, generalById } from './cardIndex.js';
 import type {
   CardSlot,
   PromptKind,
@@ -568,6 +568,72 @@ export function autoTargets(
   const hint = targetHint(cardId);
   if (!hint || (hint.max !== 'all_others' && hint.max !== 'all')) return null;
   return candidateTargets(state, viewerId, cardId);
+}
+
+/**
+ * 7.2 UX: ACTIVE skills — the third face of a Skill, started by its owner in
+ * their own action phase through the `useSkill` move. The server enforces
+ * everything (exact cost via activeCardCount, targets via the active's
+ * TargetSpec, 每回合限一次 via activeLimit); this table mirrors those specs the
+ * same way TARGET_HINTS mirrors card TargetSpecs, so the UI can offer the right
+ * shape. Until 7.2's live playtest, NOTHING offered them: the move existed on
+ * both ends and no button fired it — 制衡/结姻/离间 were simply unreachable.
+ */
+export interface ActiveSkillHint {
+  /** Exact hand-card cost, or 'any' (制衡 discards any number incl. zero; 仁德
+   * gives away any number ≥ 1). */
+  cards: number | 'any';
+  /** Cost floor when `cards` is 'any'. */
+  minCards: number;
+  targets: TargetHint;
+  /** Mirrors activeLimit: true ⇒ engine writes `used.active.<id>` into the
+   * (public) turnFlags when spent — which is what greys the button. */
+  oncePerTurn: boolean;
+}
+
+export const ACTIVE_SKILL_HINTS: Record<string, ActiveSkillHint> = {
+  zhiheng: { cards: 'any', minCards: 0, targets: { min: 0, max: 0, self: 'only' }, oncePerTurn: true },
+  rende: { cards: 'any', minCards: 1, targets: { min: 1, max: 1, self: 'forbidden' }, oncePerTurn: false },
+  jieyin: { cards: 2, minCards: 2, targets: { min: 1, max: 1, self: 'forbidden' }, oncePerTurn: true },
+  lijian: { cards: 1, minCards: 1, targets: { min: 2, max: 2, self: 'forbidden' }, oncePerTurn: true },
+  fanjian: { cards: 0, minCards: 0, targets: { min: 1, max: 1, self: 'forbidden' }, oncePerTurn: true },
+  qingnang: { cards: 1, minCards: 1, targets: { min: 1, max: 1, self: 'allowed' }, oncePerTurn: true },
+  kurou: { cards: 0, minCards: 0, targets: { min: 0, max: 0, self: 'only' }, oncePerTurn: false },
+};
+
+/** The engine's own spent-flag for a once-per-turn active — engine/limits.ts's
+ * activeLimitKey. turnFlags are public, so the client may read it to grey. */
+export function activeSkillSpent(state: TableState, skillId: string): boolean {
+  const hint = ACTIVE_SKILL_HINTS[skillId];
+  if (!hint?.oncePerTurn) return false;
+  return state.turnFlags[`used.active.${skillId}`] === true;
+}
+
+/** The viewer's usable ACTIVE skills — offered only during their own 'act'. */
+export function activeSkillsFor(state: TableState, viewerId: string): string[] {
+  const player = state.players[viewerId];
+  if (!player) return [];
+  const general = generalById(player.generalId);
+  if (!general) return [];
+  return general.skillIds.filter((id) => id in ACTIVE_SKILL_HINTS);
+}
+
+/** Seats the picker offers for an active skill — same over-offer-and-let-the-
+ * server-refuse contract as candidateTargets (predicates like 结姻's "wounded
+ * male" stay server-side). */
+export function skillCandidateTargets(
+  state: TableState,
+  viewerId: string,
+  skillId: string,
+): string[] {
+  const hint = ACTIVE_SKILL_HINTS[skillId];
+  if (!hint || hint.targets.max === 0) return [];
+  return state.seats.filter((id) => {
+    const player = state.players[id];
+    if (!player?.alive) return false;
+    if (id === viewerId) return hint.targets.self !== 'forbidden';
+    return hint.targets.self !== 'only';
+  });
 }
 
 export function livingOthers(state: TableState, viewerId: string): number {

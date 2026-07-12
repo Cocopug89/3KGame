@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { TableActions } from '../../game/actions';
 import {
   EMPTY_SELECTION,
@@ -10,14 +11,20 @@ import {
   selectionKey,
   toggleCard,
   toggleOrder,
+  toggleSkill,
+  toggleSkillCard,
   toggleTarget,
 } from '../../game/interaction';
 import type { Selection } from '../../game/interaction';
 import {
+  ACTIVE_SKILL_HINTS,
+  activeSkillSpent,
+  activeSkillsFor,
   autoTargets,
   candidateTargets,
   livingOthers as countLivingOthers,
   promptFor,
+  skillCandidateTargets,
   targetRange,
   viewerOf,
 } from '../../game/prompts';
@@ -61,6 +68,7 @@ interface GameTableProps {
  * survive into the next question.
  */
 export function GameTable({ state, viewerId, actions, rejected = false }: GameTableProps) {
+  const { t } = useTranslation();
   const { self, others } = seatsForViewer(state, viewerId);
   const positions = ringPositions(others.length);
 
@@ -82,17 +90,42 @@ export function GameTable({ state, viewerId, actions, rejected = false }: GameTa
     setSelection(EMPTY_SELECTION);
   }
 
-  const candidates = useMemo(() => {
-    if (!prompt?.needsTargets || !viewerId || selection.cards.length === 0) return [];
-    return candidateTargets(state, viewerId, selection.cards[0]);
-  }, [prompt, state, viewerId, selection.cards]);
+  // 7.2: the viewer's active skills, offered only during their own 'act'.
+  const activeSkills = prompt?.kind === 'act' && viewerId ? activeSkillsFor(state, viewerId) : [];
+  const armedHint = selection.skill ? ACTIVE_SKILL_HINTS[selection.skill] : null;
 
-  const maxTargets =
-    selection.cards.length > 0 ? (targetRange(selection.cards[0], livingOthers)?.max ?? 0) : 0;
+  const candidates = useMemo(() => {
+    if (!prompt || !viewerId) return [];
+    // Skill mode: seats come from the SKILL's spec, and (unlike a card play)
+    // may be pickable before any cost card is — 反间 costs nothing.
+    if (prompt.kind === 'act' && selection.skill) {
+      return skillCandidateTargets(state, viewerId, selection.skill);
+    }
+    if (!prompt.needsTargets || selection.cards.length === 0) return [];
+    return candidateTargets(state, viewerId, selection.cards[0]);
+  }, [prompt, state, viewerId, selection.cards, selection.skill]);
+
+  const maxTargets = armedHint
+    ? armedHint.targets.max === 'all_others'
+      ? livingOthers
+      : armedHint.targets.max === 'all'
+        ? livingOthers + 1
+        : armedHint.targets.max
+    : selection.cards.length > 0
+      ? (targetRange(selection.cards[0], livingOthers)?.max ?? 0)
+      : 0;
 
   const onToggleCard = (cardId: string) =>
     setSelection((cur) => {
       if (!prompt) return cur;
+      // Skill mode: cards are a COST — any card, capped at the skill's exact
+      // cost (or unbounded for 制衡/仁德).
+      if (prompt.kind === 'act' && cur.skill) {
+        const hint = ACTIVE_SKILL_HINTS[cur.skill];
+        if (!hint) return cur;
+        const cap = hint.cards === 'any' ? Number.POSITIVE_INFINITY : hint.cards;
+        return toggleSkillCard(cur, cardId, cap);
+      }
       const next = toggleCard(cur, prompt, cardId);
       // AoE tricks (南蛮/万箭/桃园) hit every eligible seat by rule — fill the
       // targets in the same click, so the player never has to pick them.
@@ -102,6 +135,8 @@ export function GameTable({ state, viewerId, actions, rejected = false }: GameTa
       }
       return next;
     });
+
+  const onToggleSkill = (skillId: string) => setSelection((cur) => toggleSkill(cur, skillId));
 
   const onTarget = (playerId: string) =>
     setSelection((cur) => {
@@ -125,6 +160,12 @@ export function GameTable({ state, viewerId, actions, rejected = false }: GameTa
   const submit = () => {
     if (!actions || !prompt) return;
     const [card] = selection.cards;
+    // 7.2: an armed active skill answers 'act' through useSkill, never playCard.
+    if (prompt.kind === 'act' && selection.skill) {
+      actions.useSkill(selection.skill, selection.cards, selection.targets);
+      setSelection(EMPTY_SELECTION);
+      return;
+    }
     switch (prompt.kind) {
       case 'act':
         actions.playCard(card, selection.targets);
@@ -225,10 +266,49 @@ export function GameTable({ state, viewerId, actions, rejected = false }: GameTa
           />
         ) : null}
 
+        {/* 7.2: the active-skill bar. Until it existed, useSkill had no UI and
+            制衡/结姻/离间 were unreachable in a real match. Arming a skill turns
+            the hand into a cost picker and the seats into the skill's targets;
+            clicking it again disarms. */}
+        {actions && prompt?.kind === 'act' && activeSkills.length > 0 ? (
+          <div className="skills-bar" style={{ display: 'flex', gap: '0.5rem', margin: '0.3rem 0', flexWrap: 'wrap' }}>
+            {activeSkills.map((id) => {
+              const spent = activeSkillSpent(state, id);
+              const armed = selection.skill === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  disabled={spent}
+                  title={t(`skill.${id}.desc`)}
+                  onClick={() => onToggleSkill(id)}
+                  style={{
+                    padding: '0.3rem 0.7rem',
+                    cursor: spent ? 'default' : 'pointer',
+                    opacity: spent ? 0.45 : 1,
+                    outline: armed ? '2px solid #1f6fb2' : 'none',
+                    fontWeight: armed ? 700 : 400,
+                  }}
+                >
+                  {t(`skill.${id}.name`)}
+                  {armed ? ' ✓' : ''}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
         <HandZone
           state={state}
           player={viewer}
-          prompt={prompt}
+          prompt={
+            // Skill mode: the hand is a COST picker — reuse the 'discard'
+            // gating (CARD_IS_A_COST: any card selectable) rather than the
+            // play-legality gating of 'act'.
+            selection.skill && prompt
+              ? { ...prompt, kind: 'discard', allowedEffectKeys: null }
+              : prompt
+          }
           selectedCards={selection.cards}
           onToggleCard={onToggleCard}
         />
