@@ -126,6 +126,7 @@
   "lobby.enter_table": "Enter the table",
   "lobby.leave": "Leave room",
   "lobby.rematch": "Rematch",
+  "lobby.leave_table": "Leave table",
   "ui.revealed_pool": "Revealed cards",
   "lobby.connecting": "Connecting…",
   "lobby.error.room_not_found": "No room with that code.",

@@ -139,6 +139,22 @@ export function LobbyPage() {
     setGameEnded(false);
   };
 
+  // 7.2's stuck-table escape hatch: step AWAY from the table without giving up
+  // the seat. The session survives (atTable=false), so the room's seat view
+  // renders next — from there "进入牌桌" re-attaches to the same match, and the
+  // room view's own "离开房间" (leaveSeat + dropSession) is the full exit that
+  // frees the seat. Without this, a wedged match was a trap: the stored session
+  // re-attached to it on every refresh and the table view had no way out.
+  const onBackToRoom = () => {
+    if (!session) return;
+    const next = { ...session, atTable: false };
+    saveSession(next);
+    setSession(next);
+    setAtTable(false);
+    setRoom(null); // re-resolved by the session effect above
+    setGameEnded(false);
+  };
+
   // Note there is no "leave" here: bgio's /leave destroys the match once the
   // last named player is gone, so a mid-game exit would risk taking the table
   // with it. A player who wants out closes the tab; their seat stays in the
@@ -148,8 +164,13 @@ export function LobbyPage() {
   if (session && atTable) {
     return (
       <Shell>
-        <p>
-          {t('lobby.room_code')}: <strong>{session.roomCode}</strong>
+        <p style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <span>
+            {t('lobby.room_code')}: <strong>{session.roomCode}</strong>
+          </span>
+          <button type="button" onClick={onBackToRoom} style={{ fontSize: '0.8rem' }}>
+            {t('lobby.leave_table')}
+          </button>
         </p>
         {gameEnded && (
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
